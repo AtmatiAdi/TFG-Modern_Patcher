@@ -23,6 +23,11 @@
       "repo": "AtmatiAdi/TFG-Modern_atmatiadi_mods",
       "label": "Mody AtmatiAdi",
       "side": "both"
+    },
+    {
+      "repo": "Scepeczki/TFG-Modern_scepeczki_mods",
+      "label": "Mody Scepeczki",
+      "side": "both"
     }
   ],
 
