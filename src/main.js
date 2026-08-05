@@ -60,6 +60,15 @@ function dumpLayout(w, file) {
           bodyScrollWidth: document.body.scrollWidth,
           planWidth: Math.round((document.querySelector('.plan')?.getBoundingClientRect().width) || 0),
           itemWidth: Math.round((document.querySelector('.item')?.getBoundingClientRect().width) || 0),
+          // karta z gifem MUSI byc kwadratem - prostokat znaczy, ze uklad ja sciska
+          ringBox: (r => r ? [Math.round(r.width), Math.round(r.height)] : null)
+            (document.querySelector('.card.ring')?.getBoundingClientRect()),
+          // separatory: zerowa dlugosc = linia jest w DOM, ale niewidoczna
+          dividers: [...document.querySelectorAll('.divider')].map(el => {
+            const r = el.getBoundingClientRect();
+            return { sel: el.className, box: [Math.round(r.width), Math.round(r.height)],
+                     at: [Math.round(r.x), Math.round(r.y)] };
+          }),
           overflowing: over,
         }, null, 2);
       })()`).then(async json => {

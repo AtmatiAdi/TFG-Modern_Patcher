@@ -69,25 +69,43 @@ html, body {
 main {
   position: relative; z-index: 1;
   height: calc(100% - 44px);
-  display: grid; grid-template-columns: minmax(300px, 28%) minmax(0, 1fr); gap: 14px;
+  display: grid; grid-template-columns: minmax(300px, 28%) 1px minmax(0, 1fr); gap: 14px;
   padding: 14px;
 }
 /* min-width/min-height 0 sa konieczne: bez nich dlugie linie (np. flagi JVM)
    rozpychaja kolumne gridu i tresc wychodzi poza okno */
 .col { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
 
+/* Lewa kolumna ma WLASNY suwak: dzieki temu nic sie w niej nie sciska, gdy okno jest
+   niskie - karty zachowuja swoje rozmiary (w tym kwadratowy gif), a nadmiar sie
+   przewija. flex: none na dzieciach jest tu kluczowe, bo domyslne 0 1 auto pozwala
+   im sie kurczyc, zanim suwak w ogole zdazy powstac. */
+.col.left { overflow-y: auto; overflow-x: hidden; padding-right: 4px; }
+.col.left > * { flex: none; }
+
+/* Cienkie linie miedzy sekcjami - szklo na szkle za bardzo sie zlewa.
+   Gasna na koncach, zeby nie ciac ukladu na sztywno. */
+.divider { border-radius: 1px; box-shadow: 0 0 6px rgba(255,255,255,.10); }
+.divider.v {
+  width: 1px; align-self: stretch;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,.30) 10%,
+                              rgba(255,255,255,.30) 90%, transparent);
+}
+.divider.h {
+  height: 1px; flex: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.30) 5%,
+                              rgba(255,255,255,.30) 95%, transparent);
+}
+
 /* waskie okno albo mocne skalowanie DPI - uklad schodzi do jednej kolumny */
 @media (max-width: 980px) {
   main { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
   .col { min-height: auto; }
+  /* jedna kolumna = przewija sie calosc, wiec lewa nie potrzebuje wlasnego suwaka */
+  .col.left { overflow: visible; padding-right: 0; }
   .card.log { height: 190px; }
-  .card.ring { max-height: 260px; }
+  .divider.v { display: none; }
   .plan { overflow: visible; }
-}
-
-/* niskie okno - gif oddaje miejsce kartom, ktore niosa tresc */
-@media (max-height: 760px) {
-  .card.ring { max-height: 200px; }
 }
 
 /* --------------------------------------------------------------------- szklo */
@@ -113,14 +131,13 @@ main {
 .card.log h2 { margin-bottom: 8px; }
 
 /* --------------------------------------------------------------- animacja (gif)
-   Kwadrat 1:1 o szerokosci kolumny, wiec pasuje do kart pod spodem. Gif ma
-   przezroczyste tlo, dlatego lezy wprost na szkle, bez ramki i bez kadrowania
-   (contain - przy niskim oknie karta sie splaszcza, a pierscien zostaje caly). */
+   Karta jest ZAWSZE kwadratem o szerokosci kolumny. Gif tez jest kwadratem (1080x1080),
+   wiec przy 1:1 nic sie nie kadruje i nic nie zostaje na boki. Zadnego flex-grow ani
+   max-height: probowalem tak i uklad splaszczal karte do prostokata, obcinajac gif.
+   Na niskie okno odpowiada suwak lewej kolumny, nie sciskanie tej karty. */
 .card.ring {
-  flex: 1 1 auto;
   aspect-ratio: 1 / 1;
-  min-height: 96px;
-  max-height: 340px;
+  width: 100%;
   padding: 0;
   overflow: hidden;
   display: grid;
@@ -216,11 +233,12 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: not-allowed; }
   flex: 1; overflow: auto; font: 11.5px/1.55 "Cascadia Mono", Consolas, monospace;
   color: var(--txt-dim); white-space: pre-wrap; word-break: break-word;
 }
-#logArea::-webkit-scrollbar, .plan::-webkit-scrollbar { width: 9px; }
-#logArea::-webkit-scrollbar-thumb, .plan::-webkit-scrollbar-thumb {
+#logArea::-webkit-scrollbar, .plan::-webkit-scrollbar, .col.left::-webkit-scrollbar { width: 9px; }
+#logArea::-webkit-scrollbar-thumb, .plan::-webkit-scrollbar-thumb, .col.left::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,.13); border-radius: 9px; border: 2px solid transparent; background-clip: content-box;
 }
-#logArea::-webkit-scrollbar-thumb:hover, .plan::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.24); background-clip: content-box; }
+#logArea::-webkit-scrollbar-thumb:hover, .plan::-webkit-scrollbar-thumb:hover,
+.col.left::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.24); background-clip: content-box; }
 
 /* ---------------------------------------------------------------------- plan */
 .planhead {
