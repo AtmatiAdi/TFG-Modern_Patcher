@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>TFG Patcher</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- tlo: plamy swiatla pod szklem -->
+  <div class="aurora" aria-hidden="true">
+    <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+  </div>
+
+  <header class="titlebar">
+    <div class="brand">
+      <span class="mark"></span>
+      <span class="name">TFG Patcher</span>
+      <span class="ver" id="version"></span>
+    </div>
+    <div class="winbtns">
+      <button class="wb" data-win="minimize" title="Minimalizuj"><svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg></button>
+      <button class="wb" data-win="maximize" title="Maksymalizuj"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1"/></svg></button>
+      <button class="wb close" data-win="close" title="Zamknij"><svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ---------------------------------------------------------- lewa kolumna -->
+    <section class="col left">
+      <div class="glass card target">
+        <h2>Instancja</h2>
+
+        <label class="lbl" for="instanceSelect">Wykryte instancje Prism Launchera</label>
+        <div class="selwrap">
+          <select id="instanceSelect"></select>
+          <svg class="chev" viewBox="0 0 12 12"><path d="M3 4.5L6 8l3-3.5"/></svg>
+        </div>
+
+        <label class="lbl" for="pathInput">Sciezka (instancja, katalog gry albo serwer)</label>
+        <div class="row">
+          <input id="pathInput" type="text" spellcheck="false" placeholder="C:\...\PrismLauncher\instances\...">
+          <button class="btn ghost" id="browseBtn">Przegladaj</button>
+        </div>
+
+        <div id="instanceInfo" class="info"></div>
+        <div id="warnings" class="warnings"></div>
+      </div>
+
+      <div class="glass card">
+        <h2>Profil</h2>
+        <div class="segmented" id="profileSeg"></div>
+        <div class="tunables">
+          <label class="tune">
+            <span>renderDistance</span>
+            <input id="renderDistance" type="number" min="2" max="32" step="1">
+          </label>
+          <label class="tune">
+            <span>MaxMemAlloc (MB)</span>
+            <input id="xmx" type="number" min="2048" max="32768" step="512">
+          </label>
+          <label class="check">
+            <input id="scanBox" type="checkbox" checked>
+            <span>skan zaleznosci przed wylaczaniem modow</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="glass card log">
+        <h2>Log <button class="btn tiny ghost" id="clearLog">wyczysc</button></h2>
+        <pre id="logArea"></pre>
+      </div>
+    </section>
+
+    <!-- ---------------------------------------------------------- prawa kolumna -->
+    <section class="col right">
+      <div class="planhead glass">
+        <div class="counts" id="counts"></div>
+        <div class="actions">
+          <button class="btn ghost" id="refreshBtn" title="Pobiera najnowsze wydania modow z repozytoriow (sources.json)">Sprawdz mody</button>
+          <button class="btn ghost" id="revertBtn" title="Cofa ostatnia aplikacje z kopii zapasowych">Cofnij ostatnie</button>
+          <button class="btn primary" id="applyBtn">Zastosuj zaznaczone</button>
+        </div>
+      </div>
+      <div id="plan" class="plan"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

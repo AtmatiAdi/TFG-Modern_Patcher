@@ -1,0 +1,36 @@
+{
+  "name": "tfg-patcher",
+  "version": "3.0.0",
+  "description": "Naklada nasz stan (optymalizacje, mody z wydan GitHuba, shadery, argumenty Prisma) na wskazana instancje TerraFirmaGreg-Modern albo serwer",
+  "main": "src/main.js",
+  "author": "TFG optimization project",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "cli": "node src/cli.js",
+    "refresh": "node src/cli.js --refresh",
+    "dist": "electron-builder --win portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "dev.tfg.patcher",
+    "productName": "TFG-Patcher",
+    "directories": { "output": "dist" },
+    "files": ["src/**/*", "package.json"],
+    "extraResources": [
+      { "from": "assets", "to": "assets" },
+      { "from": "sources.json", "to": "sources.json" }
+    ],
+    "win": {
+      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "artifactName": "TFG-Patcher-${version}.exe",
+      "signAndEditExecutable": false
+    },
+    "portable": { "artifactName": "TFG-Patcher-${version}.exe" },
+    "compression": "maximum"
+  }
+}

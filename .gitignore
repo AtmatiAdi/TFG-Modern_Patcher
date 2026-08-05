@@ -1,0 +1,11 @@
+# Zaleznosci i wyniki budowy
+node_modules/
+dist/
+package-lock.json
+
+# Slady dzialania Patchera w instancji, gdyby ktos testowal w tym katalogu
+.tfg-patcher/
+
+# Lokalne nadpisania: wlasny token GitHuba, prywatne zrodla modow
+sources.local.json
+token.txt

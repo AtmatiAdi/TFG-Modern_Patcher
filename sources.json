@@ -1,0 +1,22 @@
+{
+  "_": [
+    "Katalog modow pobieranych z wydan (GitHub Releases).",
+    "Dopisanie moda albo cudzego repozytorium to zmiana TYLKO tego pliku - kod zostaje.",
+    "Moda identyfikuje maska 'asset', nie tag: jedno repo moze wydawac wiele modow,",
+    "kazdy wlasnym tempem. Repo musi byc PUBLICZNE, inaczej odbiorcy dostana 404.",
+    "Jak wystawic wydanie i co znaczy kazde pole: docs/RELEASES.md."
+  ],
+
+  "mods": [
+    {
+      "id": "mapatlas",
+      "name": "Map Atlas",
+      "repo": "AtmatiAdi/TerraFirmaGreg-Modern_Optimisation",
+      "asset": "mapatlas-*.jar",
+      "replaceGlob": "mapatlas-*.jar",
+      "side": "both",
+      "doc": "mapatlas-mod.md",
+      "why": "Zastepuje Xaero: dane trzymane serwerowo, ekran na zadanie, brak cache terenu w tle."
+    }
+  ]
+}
