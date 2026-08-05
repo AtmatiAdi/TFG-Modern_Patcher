@@ -4,7 +4,8 @@
 #
 # W przeciwienstwie do wersji 2.x nic nie jest sklejane z zywej instancji gry:
 #  - mody pobiera sam Patcher z wydan wymienionych w sources.json,
-#  - do exe wchodzi tylko assets/ (shaderpack + jego ustawienia) i sources.json.
+#  - do exe wchodzi TYLKO sources.json (lista repozytoriow). Configi, shaderpack i mody
+#    pobierane sa z wydan - aplikacja nie nosi w sobie zadnych zasobow.
 #
 # Uzycie:  pwsh -File build.ps1  [-SkipInstall] [-DirOnly]
 param(
@@ -18,23 +19,7 @@ foreach ($exe in @('node', 'npm')) {
   if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { throw "Brak $exe w PATH - zainstaluj Node.js" }
 }
 
-# --- 1. sanity zasobow ---------------------------------------------------------
-$sources = Join-Path $root 'sources.json'
-if (-not (Test-Path $sources)) { throw "Brak sources.json - bez niego Patcher nie wie, skad brac mody" }
-try { Get-Content $sources -Raw | ConvertFrom-Json | Out-Null } catch { throw "sources.json nie jest poprawnym JSON-em: $_" }
-
-$shaderDir = Join-Path $root 'assets\shaderpacks'
-$packZip = Get-ChildItem $shaderDir -Filter '*.zip' -ErrorAction SilentlyContinue |
-           Sort-Object Name | Select-Object -Last 1
-if ($packZip) {
-  $packTxt = Join-Path $shaderDir ($packZip.Name + '.txt')
-  if (-not (Test-Path $packTxt)) { throw "Brak ustawien shaderow: $packTxt" }
-  Write-Host ("shaderpack: {0} ({1} MB)" -f $packZip.Name, [math]::Round($packZip.Length/1MB,1))
-} else {
-  Write-Host "UWAGA: brak shaderpacka w assets/shaderpacks - pozycje shaderowe zostana pominiete"
-}
-
-# --- 2. zaleznosci -------------------------------------------------------------
+# --- 1. zaleznosci -------------------------------------------------------------
 Push-Location $root
 try {
   if (-not $SkipInstall -or -not (Test-Path (Join-Path $root 'node_modules'))) {
@@ -43,7 +28,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "npm install zwrocil $LASTEXITCODE" }
   }
 
-  # --- 3. build ---------------------------------------------------------------
+  # --- 2. build ---------------------------------------------------------------
   if ($DirOnly) {
     Write-Host "Pakuje (tylko katalog)..."
     npx electron-builder --win dir --publish never

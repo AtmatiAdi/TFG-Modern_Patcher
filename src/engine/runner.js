@@ -4,20 +4,37 @@
 const { Journal } = require('./journal');
 const patches = require('./patches');
 
-const PROFILES = {
-  standard: { id: 'standard', renderDistance: 8,  xmx: 6144, label: 'Standard',
-              description: 'nasz standard: renderDistance 8, Xmx 6 GB' },
-  high:     { id: 'high',     renderDistance: 24, xmx: 8192, label: 'High',
-              description: 'mocne GPU i zapas RAM: renderDistance 24, Xmx 8 GB' },
-  server:   { id: 'server',   renderDistance: 0,  xmx: 6144, label: 'Serwer',
-              description: 'serwer dedykowany: tylko zmiany serwerowe' },
+/**
+ * Profile sa DANYMI presetu: aplikacja zna tylko POJECIE profilu (selektor w oknie,
+ * wykrycie serwera, reczne nadpisanie galek), a nazwy i wartosci przychodza
+ * z repozytorium configow.
+ *
+ * To jest jedyny profil wbudowany i celowo nie niesie zadnej wartosci optymalizacyjnej -
+ * istnieje po to, zeby okno mialo co pokazac, zanim jakikolwiek preset zostanie pobrany.
+ */
+const FALLBACK_PROFILES = {
+  standard: { id: 'standard', label: 'Standard', default: true,
+              description: 'bez presetu - same mody z repozytoriow' },
 };
 
-function defaults(profileId = 'standard') {
-  const profile = PROFILES[profileId] || PROFILES.standard;
+function profiles() {
+  return patches.profiles() || FALLBACK_PROFILES;
+}
+
+function defaultProfileId() {
+  const all = profiles();
+  const marked = Object.values(all).find(p => p.default);
+  return (marked || Object.values(all)[0]).id;
+}
+
+function defaults(profileId) {
+  const all = profiles();
+  const profile = all[profileId] || all[defaultProfileId()];
+  // renderDistance i xmx to zmienne PROFILU z presetu - bez presetu nie mamy ich skad
+  // wziac i nie zmyslamy. Pola liczbowe w oknie zostaja wtedy przy tym, co pokazuja.
   return {
     profile: profile.id,
-    renderDistance: profile.renderDistance || 8,
+    renderDistance: profile.renderDistance,
     xmx: profile.xmx,
     scan: true,
     force: false,
@@ -35,16 +52,21 @@ function overall(statuses) {
 }
 
 /**
- * @returns {{id,title,doc,why,side,state,skipReason,statuses,details}[]}
+ * @returns {{id,title,doc,why,side,state,selected,skipReason,statuses,details}[]}
  */
 function plan(inst, opts) {
-  return patches.all().map(patch => {
+  return patches.all(opts, inst).map(patch => {
     const item = {
       id: patch.id, title: patch.title, doc: patch.doc, why: patch.why, side: patch.side,
       group: patch.group || 'optimizations',
+      // Preset moze powiedziec, ze pozycja ma byc widoczna, ale NIEzaznaczona
+      // (np. narzedzie RAM w profilu "high"). Domyslnie: zaznaczona.
+      selected: patch.selected !== false,
       skipReason: null, statuses: [], details: patch.changes.map(c => c.describe(opts)),
     };
-    if (!appliesTo(patch.side, inst.side)) {
+    if (patch.broken) {
+      item.statuses = [{ state: 'error', text: patch.broken }];
+    } else if (!appliesTo(patch.side, inst.side)) {
       item.skipReason = 'dotyczy tylko strony: ' + patch.side;
     } else {
       item.statuses = patch.changes.map(c => c.check(inst, opts));
@@ -63,9 +85,10 @@ function apply(inst, opts, ids, log = () => {}) {
   const journal = new Journal(inst.root);
   let applied = 0, failed = 0, skipped = 0;
 
-  for (const patch of patches.all()) {
+  for (const patch of patches.all(opts, inst)) {
     if (!ids.includes(patch.id)) continue;
     if (!appliesTo(patch.side, inst.side)) { skipped++; continue; }
+    if (patch.broken) { log(`* ${patch.id} - POMINIETE: ${patch.broken}`); failed++; continue; }
 
     const fresh = patch.changes.map(c => c.check(inst, opts));
     if (!fresh.some(s => s.state === 'todo')) { skipped++; continue; }
@@ -92,4 +115,4 @@ function apply(inst, opts, ids, log = () => {}) {
   return { applied, failed, skipped, journal: journalFile };
 }
 
-module.exports = { PROFILES, defaults, plan, apply };
+module.exports = { profiles, defaults, defaultProfileId, plan, apply, FALLBACK_PROFILES };

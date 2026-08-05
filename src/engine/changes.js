@@ -7,8 +7,8 @@
 const fs = require('fs');
 const path = require('path');
 const tc = require('./textconfig');
-const assets = require('./assets');
 const modscan = require('./modscan');
+const zip = require('./zip');
 
 const ok      = text => ({ state: 'ok', text });
 const todo    = text => ({ state: 'todo', text });
@@ -81,20 +81,9 @@ function globToRe(glob) {
 }
 
 /**
- * Zrodlo bajtow do wgrania. Dwa rodzaje, ta sama obsluga dalej:
- *  - assetResource: plik dolaczony do aplikacji (shaderpack),
- *  - fileResource:  plik pobrany z wydania i lezacy w cache.
+ * Zrodlo bajtow do wgrania. Zawsze plik lezacy w cache - pobrany z wydania modu
+ * albo z wydania presetu. Aplikacja nie nosi w sobie zadnych zasobow.
  */
-function assetResource(rel) {
-  return {
-    describe: () => rel,
-    exists: () => assets.exists(rel),
-    size: () => assets.size(rel),
-    read: () => assets.read(rel),
-    missingText: () => 'brak pliku w zasobach aplikacji: ' + rel,
-  };
-}
-
 function fileResource(absPath, missingText) {
   return {
     describe: () => (absPath ? path.basename(absPath) : '?'),
@@ -106,7 +95,7 @@ function fileResource(absPath, missingText) {
 }
 
 function toResource(resource) {
-  return typeof resource === 'string' ? assetResource(resource) : resource;
+  return resource;
 }
 
 function installFile({ resource, target, label, replaceGlob = null, onlyIfMissing = false }) {
@@ -151,6 +140,57 @@ function installFile({ resource, target, label, replaceGlob = null, onlyIfMissin
       fs.writeFileSync(dest, src.read());
       if (!existed) journal.recordAdd(dest);
       log(`    wgrano ${path.basename(dest)} (${src.size()} B)${existed ? ' [nadpisano]' : ''}`);
+    },
+  };
+}
+
+// ------------------------------------------------------ rozpakowanie archiwum
+
+/**
+ * Rozpakowanie ZIP-a do katalogu (narzedzia z grupy "tools").
+ *
+ * Kazdy wypakowany plik trafia do dziennika osobno, wiec "Cofnij ostatnie" sprzata
+ * po narzedziu tak samo dokladnie, jak po pojedynczym pliku.
+ */
+function installArchive({ resource, target, label, onlyIfMissing = false }) {
+  const src = toResource(resource);
+
+  const files = () => zip.entries(src.read())
+    .filter(e => !e.name.endsWith('/') && !e.name.includes('..'));
+
+  return {
+    describe: () => `rozpakowanie ${label}${onlyIfMissing ? ' (tylko gdy brak)' : ''}`,
+    check(inst) {
+      const dir = target(inst);
+      if (!src.exists()) return missing(src.missingText());
+      try {
+        const entries = files();
+        if (fs.existsSync(dir) && onlyIfMissing) return ok(`${label}: juz jest, nie ruszam`);
+        const stale = entries.filter(e => {
+          const dest = path.join(dir, e.name);
+          return !fs.existsSync(dest) || fs.statSync(dest).size !== e.size;
+        });
+        if (!stale.length) return ok(`${label}: ${entries.length} plikow, aktualne`);
+        return todo(`${label}: rozpakuje ${stale.length} z ${entries.length} plikow`);
+      } catch (e) {
+        return error(`${label}: ${e.message}`);
+      }
+    },
+    apply(inst, opts, journal, log) {
+      const dir = target(inst);
+      if (fs.existsSync(dir) && onlyIfMissing) return;
+      const buf = src.read();
+      let n = 0;
+      for (const entry of files()) {
+        const dest = path.join(dir, entry.name);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        const existed = fs.existsSync(dest);
+        if (existed) journal.backup(dest);
+        fs.writeFileSync(dest, zip.read(buf, entry));
+        if (!existed) journal.recordAdd(dest);
+        n++;
+      }
+      log(`    rozpakowano ${n} plikow do ${path.basename(dir)}`);
     },
   };
 }
@@ -221,4 +261,4 @@ function disableMods({ prefixes, scan }) {
   };
 }
 
-module.exports = { setKey, setJson, installFile, disableMods, assetResource, fileResource };
+module.exports = { setKey, setJson, installFile, installArchive, disableMods, fileResource };

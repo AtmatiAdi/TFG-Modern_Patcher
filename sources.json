@@ -1,22 +1,35 @@
 {
   "_": [
-    "Katalog modow pobieranych z wydan (GitHub Releases).",
-    "Dopisanie moda albo cudzego repozytorium to zmiana TYLKO tego pliku - kod zostaje.",
-    "Moda identyfikuje maska 'asset', nie tag: jedno repo moze wydawac wiele modow,",
-    "kazdy wlasnym tempem. Repo musi byc PUBLICZNE, inaczej odbiorcy dostana 404.",
-    "Jak wystawic wydanie i co znaczy kazde pole: docs/RELEASES.md."
+    "REPOZYTORIA, ktorych Patcher pyta o zawartosc. NIE ma tu listy modow ani listy",
+    "optymalizacji - te Patcher wyczytuje z wydan, wiec nowy mod albo nowa wersja",
+    "configow NIE wymaga nowej wersji aplikacji.",
+    "",
+    "mods    - Patcher przeglada wydania i rozklada tagi wg konwencji <mod>-<x.y.z>,",
+    "          grupuje po nazwie moda i bierze najwyzsza wersje kazdego.",
+    "          Wydanie 'mapatlas-0.4.0' z zalacznikiem 'mapatlas-0.4.0.jar' wystarczy.",
+    "",
+    "configs - Patcher szuka najnowszego wydania z zalacznikiem 'preset-*.json'.",
+    "          Manifest opisuje optymalizacje, profile i shaderpack (docs/PRESET-FORMAT.md).",
+    "",
+    "Wlasne zrodla mozna dopisac BEZ ruszania aplikacji, w pliku uzytkownika:",
+    "  %LOCALAPPDATA%\\TFG-Patcher\\sources.json     (ten sam format, dokladany do tego)",
+    "",
+    "Repozytorium musi byc PUBLICZNE - na prywatne GitHub odpowiada 404, wiec dla",
+    "anonimowego Patchera u odbiorcy po prostu nie istnieje."
   ],
 
   "mods": [
     {
-      "id": "mapatlas",
-      "name": "Map Atlas",
-      "repo": "AtmatiAdi/TerraFirmaGreg-Modern_Optimisation",
-      "asset": "mapatlas-*.jar",
-      "replaceGlob": "mapatlas-*.jar",
-      "side": "both",
-      "doc": "mapatlas-mod.md",
-      "why": "Zastepuje Xaero: dane trzymane serwerowo, ekran na zadanie, brak cache terenu w tle."
+      "repo": "AtmatiAdi/TFG-Modern_atmatiadi_mods",
+      "label": "Mody AtmatiAdi",
+      "side": "both"
+    }
+  ],
+
+  "configs": [
+    {
+      "repo": "AtmatiAdi/TFG-Modern_atmatiadi_configs",
+      "label": "Configi AtmatiAdi"
     }
   ]
 }

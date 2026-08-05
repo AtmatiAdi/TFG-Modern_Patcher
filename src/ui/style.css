@@ -80,8 +80,14 @@ main {
 @media (max-width: 980px) {
   main { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
   .col { min-height: auto; }
-  .card.log { min-height: 150px; max-height: 220px; }
+  .card.log { height: 190px; }
+  .card.ring { max-height: 260px; }
   .plan { overflow: visible; }
+}
+
+/* niskie okno - gif oddaje miejsce kartom, ktore niosa tresc */
+@media (max-height: 760px) {
+  .card.ring { max-height: 200px; }
 }
 
 /* --------------------------------------------------------------------- szklo */
@@ -101,7 +107,29 @@ main {
   color: var(--txt-faint); font-weight: 700; margin-bottom: 12px;
   display: flex; align-items: center; justify-content: space-between;
 }
-.card.log { flex: 1; min-height: 130px; display: flex; flex-direction: column; }
+/* Log jest pod lista zmian: szeroki, ale niski - wysokosc na kilkanascie linii,
+   reszta miejsca nalezy do planu. */
+.card.log { flex: none; height: 172px; display: flex; flex-direction: column; padding: 10px 14px 12px; }
+.card.log h2 { margin-bottom: 8px; }
+
+/* --------------------------------------------------------------- animacja (gif)
+   Kwadrat 1:1 o szerokosci kolumny, wiec pasuje do kart pod spodem. Gif ma
+   przezroczyste tlo, dlatego lezy wprost na szkle, bez ramki i bez kadrowania
+   (contain - przy niskim oknie karta sie splaszcza, a pierscien zostaje caly). */
+.card.ring {
+  flex: 1 1 auto;
+  aspect-ratio: 1 / 1;
+  min-height: 96px;
+  max-height: 340px;
+  padding: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.card.ring img {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+  user-select: none; -webkit-user-drag: none;
+}
 
 /* ------------------------------------------------------------------ kontrolki */
 .lbl { display: block; font-size: 11px; color: var(--txt-faint); margin: 10px 0 5px; }
@@ -223,8 +251,28 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: not-allowed; }
 .item.skipped, .item.missing { opacity: .45; }
 .item.error { border-left: 2px solid var(--err); }
 
+/* ---- zwijanie: zrobione i odznaczone kurcza sie do samego tytulu ---------- */
+.item.collapsed { padding: 8px 15px; }
+.item.collapsed .why,
+.item.collapsed .lines,
+.item.collapsed .doc { display: none; }
+.item.collapsed .toggle svg { transform: rotate(-90deg); }
+
+.toggle {
+  margin-left: auto; flex: none; align-self: center; width: 22px; height: 22px; padding: 0;
+  display: grid; place-items: center; cursor: pointer;
+  background: none; border: 0; border-radius: 7px; color: var(--txt-faint);
+}
+.toggle svg {
+  width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform .15s;
+}
+.toggle:hover { background: rgba(255,255,255,.09); color: var(--txt); }
+
+.pill.collapsed { color: var(--txt-faint); background: rgba(255,255,255,.05); border-color: var(--edge-soft); }
+
 .item > div { min-width: 0; }
-.item .head { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.item .head { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; cursor: pointer; }
 .item .title { font-weight: 600; color: var(--txt); overflow-wrap: anywhere; }
 .item .why { font-size: 11.5px; color: var(--txt-faint); margin-top: 3px; overflow-wrap: anywhere; }
 .item .doc { font-size: 10.5px; color: var(--txt-faint); margin-top: 6px; }

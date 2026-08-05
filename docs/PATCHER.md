@@ -1,7 +1,9 @@
 # Patcher — architektura i rozwój
 
 Dla kogoś, kto ma **zmieniać** to narzędzie. Jak go używać: `../README.md`.
-Skąd się wzięły pozycje planu: `OPTIMIZATIONS-SPEC.md`. Zasady i kontekst: `CONTEXT.md`.
+Zasady i kontekst: `CONTEXT.md`. Skąd się biorą pozycje planu i dlaczego akurat takie —
+to już nie tutaj, tylko w repozytorium configów (`docs/OPTIMIZATIONS-SPEC.md`,
+`docs/PRESET-FORMAT.md`).
 
 ---
 
@@ -25,15 +27,23 @@ Skąd się wzięły pozycje planu: `OPTIMIZATIONS-SPEC.md`. Zasady i kontekst: `
 ## Przepływ
 
 ```
-sources.json ──► catalog.refresh()  ──► pliki w cache        (jedyna siec, na zadanie)
-                        │
+sources.json (REPOZYTORIA, nie mody)
+      │
+      ├─ mods:    listReleases ─► discover.mods()  ─► jary w cache
+      └─ configs: listReleases ─► preset-*.json    ─► manifest + zalaczniki w cache
+                        │                (catalog.refresh - jedyna siec, na zadanie)
                         ▼
-instance.detect(dir) ──► patches.all() ──► runner.plan()  ──► lista pozycji ze stanem
-                                                │
-                                     zaznaczenie w UI / --only
-                                                ▼
-                                          runner.apply()  ──► journal ──► .tfg-patcher/
+                  compile(manifest) ──┐
+                                      ├─► patches.all(opts, inst) ─► runner.plan()
+instance.detect(dir) ─────────────────┘                                   │
+                                                            zaznaczenie w UI / --only
+                                                                          ▼
+                                                    runner.apply() ─► journal ─► .tfg-patcher/
 ```
+
+Aplikacja nie zawiera **ani jednej** nazwy moda i **ani jednej** wartości configu.
+`compile.js` zamienia manifest na dokładnie te same obiekty operacji, których silnik
+używał zawsze — zmienia się źródło listy, nie sposób jej wykonywania.
 
 **Stany pozycji:** `ok` (zrobione) · `todo` (do zmiany) · `missing` (brak celu — np. nie ma
 pliku configu) · `error` · `skipped` (nie dotyczy tej strony: klient/serwer).
@@ -41,6 +51,13 @@ pliku configu) · `error` · `skipped` (nie dotyczy tej strony: klient/serwer).
 `runner.apply()` sprawdza stan każdej operacji **ponownie tuż przed wykonaniem**. Bez tego
 pozycja zależna od poprzedniej wyglądałaby na „brak celu": shaderpack dopiero tworzy plik
 ustawień, który zmienia pozycja `shaders-light`.
+
+**Zwijanie pozycji w oknie.** Reguła jest jedna: *rozwinięte jest to, co zaznaczone* —
+czyli to, co faktycznie się wydarzy po kliknięciu. Zrobione, pominięte i ręcznie odznaczone
+kurczą się do samego tytułu (przy 12 pozycjach, z których 9 jest „ZROBIONE", to różnica
+między listą do czytania a ścianą tekstu). Wyjątek: **pozycji w stanie `error` nie zwijamy
+nigdy** — niewidoczny błąd jest gorszy niż bałagan. Ręczne kliknięcie w nagłówek nadpisuje
+regułę do czasu przebudowy planu; zmiana pola wyboru wraca do automatu.
 
 ---
 
@@ -102,15 +119,19 @@ wykonanie, chyba że `--force`). Efekt na naszej paczce: 255 modów, 0 twardych,
 
 ---
 
-## Dodanie nowej pozycji planu
+## Dodanie nowej pozycji planu — nie tutaj
 
-1. Dopisz sekcję do `OPTIMIZATIONS-SPEC.md` — **najpierw uzasadnienie, potem kod**.
-2. Dodaj pozycję w `engine/patches.js`: `id`, `side`, `group`, `title`, `doc`, `why`
-   i listę `changes` złożoną z gotowych operacji (`setKey`, `setJson`, `installFile`,
-   `disableMods`).
-3. Potrzebujesz nowego rodzaju operacji? Dopisz go w `engine/changes.js` — musi mieć
-   `describe`, `check` i `apply` (z zapisem do dziennika).
-4. Sprawdź na atrapie instancji: plan → apply → ponowny plan (wszystko „ZROBIONE") →
+Pozycja planu to wpis w `preset.json` w repozytorium configów, a nie zmiana w kodzie.
+**W tym repo nie dopisuje się optymalizacji.** Tutaj przychodzisz tylko wtedy, gdy
+istniejące operacje nie wystarczają:
+
+1. Nowy rodzaj operacji — dopisz go w `engine/changes.js` (musi mieć `describe`, `check`
+   i `apply` z zapisem do dziennika), podepnij w `engine/compile.js` i dodaj do listy
+   `OPS` w `engine/preset.js`.
+2. Opisz go w `PRESET-FORMAT.md` **po obu stronach** i podbij `formatVersion` — to umowa,
+   nie szczegół implementacji. Starszy Patcher musi odrzucić manifest, którego nie umie
+   wykonać, zamiast wykonać go połowicznie.
+3. Sprawdź na atrapie instancji: plan → apply → ponowny plan (wszystko „ZROBIONE") →
    revert (stan wraca).
 
 ---
@@ -131,7 +152,10 @@ src/
     runner.js        profile, budowa planu, wykonanie
     journal.js       kopie zapasowe i cofanie
     modscan.js       skan constant pool jarow (twarde vs miekkie referencje)
-    catalog.js       sources.json -> pliki na dysku (jedyne miejsce z siecia)
+    catalog.js       repozytoria -> pliki na dysku (jedyne miejsce z siecia)
+    discover.js      tagi wydan -> mody (czysta logika, zero sieci)
+    preset.js        wczytanie i WALIDACJA manifestu configow
+    compile.js       manifest -> pozycje planu (zmienne, sciezki, operacje)
     release.js       klient GitHub Releases + cache
     assets.js        pliki dolaczone do aplikacji (shaderpack)
     zip.js           wlasny czytnik ZIP (EOCD + inflateRaw)

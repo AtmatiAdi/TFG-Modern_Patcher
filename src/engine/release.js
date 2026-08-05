@@ -117,6 +117,30 @@ async function findRelease(repo, assetGlob) {
   return hit;
 }
 
+/**
+ * WSZYSTKIE wydania repozytorium (bez draftow rozroznianych tutaj - to robi discover).
+ *
+ * Jedno zapytanie na repozytorium zamiast jednego na moda: Patcher nie zna listy modow,
+ * wiec musi zobaczyc cale repo i dopiero z tagow wyczytac, co w nim jest.
+ * Stronicujemy do MAX_PAGES - przy konwencji "jedno wydanie = jeden mod" 500 wydan
+ * starcza na lata, a nieskonczona petla po cudzym repo to proszenie sie o klopoty.
+ */
+async function listReleases(repo, log = () => {}) {
+  const MAX_PAGES = 5;
+  const PER_PAGE = 100;
+  const out = [];
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const body = await get(`${API}/repos/${repo}/releases?per_page=${PER_PAGE}&page=${page}`,
+                           'application/vnd.github+json');
+    const batch = JSON.parse(body.toString('utf8'));
+    if (!Array.isArray(batch)) throw new Error('nieoczekiwana odpowiedz GitHuba');
+    out.push(...batch.map(shape));
+    if (batch.length < PER_PAGE) break;
+    if (page === MAX_PAGES) log(`    uwaga: ${repo} ma wiecej niz ${MAX_PAGES * PER_PAGE} wydan`);
+  }
+  return out;
+}
+
 function pickAsset(release, glob) {
   const re = globToRe(glob);
   const hits = release.assets.filter(a => re.test(a.name));
@@ -173,4 +197,5 @@ function newestCached(repo, glob) {
   return best;
 }
 
-module.exports = { cacheDir, token, findRelease, pickAsset, fetchAsset, newestCached, assetPath };
+module.exports = { cacheDir, token, findRelease, listReleases, pickAsset, fetchAsset,
+                   newestCached, assetPath };

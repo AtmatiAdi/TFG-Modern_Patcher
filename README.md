@@ -1,8 +1,8 @@
 # TFG Patcher
 
-Aplikacja, która nakłada nasz stan optymalizacyjny TerraFirmaGreg-Modern na **wskazaną
-instancję gry albo serwer**: configi modów, ustawienia gry, argumenty JVM Prisma,
-shaderpack i mody pobierane z wydań GitHuba.
+Aplikacja, która nakłada na **wskazaną instancję gry albo serwer** stan pobrany z wydań
+GitHuba: configi modów, ustawienia gry, argumenty JVM Prisma, shaderpack, narzędzia i mody.
+Sama nie zna żadnej optymalizacji ani żadnego moda — czyta, co niosą repozytoria.
 
 Pojedynczy przenośny `.exe` — nie wymaga Javy ani niczego doinstalowanego.
 
@@ -16,20 +16,26 @@ Pojedynczy przenośny `.exe` — nie wymaga Javy ani niczego doinstalowanego.
 3. Wybierz profil maszyny.
 4. **Plan pokazuje się sam** i odświeża po każdej zmianie: każda pozycja osobno, ze stanem
    *zrobione / do zmiany / brak celu*. Zaznaczone jest to, co faktycznie jest do zrobienia.
+   Pozycje **zrobione i odznaczone zwijają się do samego tytułu**, żeby zostało na wierzchu
+   to, co się wydarzy — klik w nagłówek rozwija pojedynczą, przycisk **Rozwiń wszystko**
+   pokazuje całość.
 5. **Zastosuj zaznaczone.**
 
-| Profil | renderDistance | MaxMemAlloc | Dla kogo |
-|---|---|---|---|
-| **Standard** | 8 | 6144 MB | domyślny — sprawdzony na 16 GB RAM |
-| **High** | 24 | 8192 MB | maszyna z zapasem RAM |
-| **Serwer** | — | 6144 MB | wykrywany sam; tylko zmiany serwerowe |
+| Profil | Dla kogo |
+|---|---|
+| **Standard** | domyślny — sprawdzony na 16 GB RAM |
+| **High** | maszyna z zapasem RAM |
+| **Serwer** | wykrywany sam; tylko zmiany serwerowe |
+
+Profile i ich wartości (`renderDistance`, `MaxMemAlloc`) przychodzą **z presetu**, nie
+z aplikacji — gałki po lewej pokazują to, co niesie profil, i wolno je nadpisać ręcznie.
 
 **Nic nie dzieje się bez kliknięcia**, a każda zmiana jest odwracalna: kopie plików lądują
 w `.tfg-patcher/backup-<data>/` w katalogu instancji, a przycisk **Cofnij ostatnie**
 przywraca stan sprzed ostatniego uruchomienia.
 
-Przycisk **Sprawdź mody** pobiera najnowsze wydania modów. Bez internetu aplikacja działa
-na tym, co już ściągnęła.
+Przycisk **Sprawdź źródła** pobiera najnowsze wydania modów i presetu. Bez internetu
+aplikacja działa na tym, co już ściągnęła.
 
 ### Serwery i Linux
 
@@ -44,10 +50,55 @@ node src/cli.js -i /sciezka/do/serwera --revert
 
 ---
 
+## Budowa i wydanie
+
+```powershell
+pwsh -File build.ps1        # zbuduj -> dist/TFG-Patcher-<wersja>.exe
+pwsh -File release.ps1      # pokaz ostatnie wydanie, zapytaj o numer, zbuduj i wydaj
+```
+
+`release.ps1` prowadzi za rękę i **nic nie robi po cichu**:
+
+```
+Stan repozytorium
+  package.json:      3.1.0
+  ostatnie wydanie:  v3.1.0  (2026-08-05)
+                     https://github.com/AtmatiAdi/TFG-Modern_Patcher/releases/tag/v3.1.0
+
+Nowe wydanie
+  Numer nowej wersji (x.y.z), Enter = 3.1.1: 3.1
+  numer ma miec postac x.y.z, np. 3.1.1
+  Numer nowej wersji (x.y.z), Enter = 3.1.1: 3.0.9
+  package.json ma juz 3.1.0 - podaj numer nie nizszy
+  Numer nowej wersji (x.y.z), Enter = 3.1.1: <Enter>
+
+Plan wydania
+  wersja:  3.1.0 -> 3.1.1
+  tag:     v3.1.1
+  plik:    ...\dist\TFG-Patcher-3.1.1.exe
+  Wydac? [t/N]
+```
+
+Pyta dopóki numer nie przejdzie kontroli: musi mieć postać `x.y.z`, nie być niższy niż
+`package.json` i **nie kolidować z istniejącym wydaniem** (porównanie po segmentach, więc
+`0.10.0` jest wyżej niż `0.9.0`). Potem podbija wersję w `package.json`, buduje `.exe`,
+commituje, wypycha i publikuje wydanie z tym plikiem (`gh release create`, opis
+generowany z commitów).
+
+| Przełącznik | Do czego |
+|---|---|
+| `-Version 3.1.1` | bez pytania — do skryptów |
+| `-DryRun` | tylko sprawdzenie i wypisanie, co by się stało; nie rusza `package.json` |
+| `-SkipBuild` | gdy `.exe` o tej wersji już leży w `dist/` |
+| `-Yes` | bez pytania „Wydać?" |
+
+Wymaga `gh` zalogowanego przez `gh auth login`.
+
+---
+
 ## Dla rozwijających
 
 ```powershell
-pwsh -File build.ps1        # -> dist/TFG-Patcher-<wersja>.exe
 npm start                   # okno bez pakowania
 node src\cli.js --list      # co aplikacja wprowadza, grupami
 node src\cli.js --refresh   # samo pobranie wydan do cache
@@ -55,32 +106,39 @@ node src\cli.js --refresh   # samo pobranie wydan do cache
 
 | Dokument | O czym |
 |---|---|
-| **`docs/CONTEXT.md`** | **zacznij tutaj** — po co to jest, śledztwo RAM w skrócie, konwencje, czego nie ruszać |
-| `docs/RELEASES.md` | jak wydawać mody, żeby Patcher je widział; jak dodać repo współpracownika |
-| `docs/OPTIMIZATIONS-SPEC.md` | każda pozycja planu i jej uzasadnienie pomiarowe |
+| **`docs/CONTEXT.md`** | **zacznij tutaj** — po co to jest, konwencje, czego nie ruszać |
 | `docs/PATCHER.md` | architektura, struktura kodu, pułapki |
-| `docs/ram/FINDINGS.md` | pełny zapis pomiarów (chronologicznie) |
-| `docs/ram/HANDOFF.md` | brief: stan śledztwa RAM, co obalone |
+| `docs/RELEASES.md` | jak wydawać mody i preset, żeby Patcher je zobaczył |
 
-Dodanie moda do Patchera = wpis w `sources.json`. Bez zmian w kodzie.
+Uzasadnienia optymalizacji i pomiary RAM **nie leżą w tym repo** — są tam, gdzie
+powstają, czyli w `TFG-Modern_atmatiadi_configs` (`docs/OPTIMIZATIONS-SPEC.md`,
+`docs/ram/`, `docs/PRESET-FORMAT.md`).
+
+Dodanie **moda** = wydanie jara z tagiem `<mod>-<x.y.z>`. Dodanie **optymalizacji** =
+wydanie nowego `preset-*.json`. Jedno i drugie bez zmian w kodzie i bez nowego `.exe`.
 
 ---
 
 ## Skąd się biorą mody
 
-Patcher nie nosi modów w sobie. Czyta `sources.json`, pyta GitHuba o najnowsze wydanie
-każdego wymienionego repozytorium i pobiera z niego załącznik pasujący do maski:
+Patcher **nie zna żadnego moda ani żadnej optymalizacji**. Zna repozytoria — `sources.json`
+wymienia same adresy:
 
 ```json
 {
-  "id": "mapatlas",
-  "name": "Map Atlas",
-  "repo": "AtmatiAdi/TerraFirmaGreg-Modern_Optimisation",
-  "asset": "mapatlas-*.jar",
-  "replaceGlob": "mapatlas-*.jar"
+  "mods":    [ { "repo": "AtmatiAdi/TFG-Modern_atmatiadi_mods" } ],
+  "configs": [ { "repo": "AtmatiAdi/TFG-Modern_atmatiadi_configs" } ]
 }
 ```
 
-Dzięki temu każdy współpracownik trzyma swoje mody u siebie i wydaje je własnym tempem,
-a Patcher jest tylko dystrybutorem. Repozytorium z grą i źródłami naszych modów jest
-osobno — patrz `docs/CONTEXT.md`.
+**Mody** rozpoznaje po tagach wydań (`<mod>-<x.y.z>`, np. `mapatlas-0.4.0`): grupuje po
+nazwie moda i bierze najwyższą wersję każdego. Wydanie jara wystarczy — nowy mod pojawia
+się w planie u wszystkich, bez nowej wersji aplikacji.
+
+**Configi** czyta z załącznika `preset-*.json` w najnowszym wydaniu repozytorium configów.
+Manifest opisuje optymalizacje, profile maszyn i shaderpack. Zmiana `renderDistance` to
+nowe wydanie presetu, nie nowy `.exe`.
+
+Własne repozytoria dopisuje się bez ruszania aplikacji, w
+`%LOCALAPPDATA%\TFG-Patcher\sources.json`. Repozytorium musi być **publiczne** — na
+prywatne GitHub odpowiada `404`, więc dla anonimowego Patchera nie istnieje.

@@ -28,6 +28,11 @@
   <main>
     <!-- ---------------------------------------------------------- lewa kolumna -->
     <section class="col left">
+      <!-- Ozdoba. Kwadrat 1:1 z przezroczystym tlem, wiec siada na szkle bez ramki. -->
+      <div class="glass card ring">
+        <img src="ring.gif" alt="" draggable="false">
+      </div>
+
       <div class="glass card target">
         <h2>Instancja</h2>
 
@@ -65,11 +70,6 @@
           </label>
         </div>
       </div>
-
-      <div class="glass card log">
-        <h2>Log <button class="btn tiny ghost" id="clearLog">wyczysc</button></h2>
-        <pre id="logArea"></pre>
-      </div>
     </section>
 
     <!-- ---------------------------------------------------------- prawa kolumna -->
@@ -77,12 +77,19 @@
       <div class="planhead glass">
         <div class="counts" id="counts"></div>
         <div class="actions">
-          <button class="btn ghost" id="refreshBtn" title="Pobiera najnowsze wydania modow z repozytoriow (sources.json)">Sprawdz mody</button>
+          <button class="btn ghost" id="expandBtn" title="Zwiniete sa pozycje zrobione i odznaczone - zostaje sam tytul">Rozwin wszystko</button>
+          <button class="btn ghost" id="refreshBtn" title="Sprawdza repozytoria z sources.json: mody (po tagach wydan) i configi (preset-*.json)">Sprawdz zrodla</button>
           <button class="btn ghost" id="revertBtn" title="Cofa ostatnia aplikacje z kopii zapasowych">Cofnij ostatnie</button>
           <button class="btn primary" id="applyBtn">Zastosuj zaznaczone</button>
         </div>
       </div>
       <div id="plan" class="plan"></div>
+
+      <!-- Log siedzi pod lista zmian: szeroki i niski, bo czyta sie go linia po linii. -->
+      <div class="glass card log">
+        <h2>Log <button class="btn tiny ghost" id="clearLog">wyczysc</button></h2>
+        <pre id="logArea"></pre>
+      </div>
     </section>
   </main>
 

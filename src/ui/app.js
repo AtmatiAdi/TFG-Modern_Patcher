@@ -20,6 +20,7 @@ const els = {
   apply: $('#applyBtn'),
   revert: $('#revertBtn'),
   refresh: $('#refreshBtn'),
+  expand: $('#expandBtn'),
   log: $('#logArea'),
   clearLog: $('#clearLog'),
 };
@@ -32,6 +33,11 @@ const state = {
   checked: new Set(),
   busy: false,
   planToken: 0,
+  // Zwijanie: domyslnie rozwiniete jest to, co zaznaczone (czyli to, co sie wydarzy).
+  // manualExpand trzyma recznie wymuszony stan pojedynczych pozycji - kasowany przy
+  // nowym planie, bo wtedy zmienia sie sam zestaw pozycji.
+  manualExpand: new Map(),
+  expandAll: false,
 };
 
 const STATE_LABEL = { ok: 'zrobione', todo: 'do zmiany', missing: 'brak celu', error: 'blad', skipped: 'pominiete' };
@@ -52,13 +58,18 @@ function log(msg) {
   els.version.textContent = 'v' + info.version;
   buildProfileSegments();
   applyProfileDefaults('standard');
+  updateExpandBtn();
 
   window.patcher.onLog(log);
 
   const res = await window.patcher.instances();
   fillInstances(res.instances || []);
 
-  log('TFG Patcher ' + info.version + ' - zrodla modow: ' + info.sourcesFile);
+  log('TFG Patcher ' + info.version + ' - repozytoria zrodlowe: ' + info.sourcesFile);
+  log(info.usingPreset
+    ? 'Optymalizacje z presetu pobranego z repozytorium configow.'
+    : 'Brak presetu - zadne repozytorium configow nie ma wydania z preset-*.json. '
+      + 'Plan pokazuje same mody.');
   log('Plan odswieza sie sam. Zaznacz pozycje i kliknij "Zastosuj zaznaczone".');
   refreshPlan();
   doRefreshMods(true);
@@ -88,7 +99,9 @@ function applyProfileDefaults(id) {
   // przelaczenie profilu przywraca JEGO wartosci; recznie mozna je potem nadpisac
   if (p.renderDistance) els.renderDistance.value = p.renderDistance;
   if (p.xmx) els.xmx.value = p.xmx;
-  els.renderDistance.disabled = id === 'server';
+  // Profil bez renderDistance (serwerowy) nie ma czego tu ustawiac. Sprawdzamy
+  // wartosc, nie nazwe - nazwy profili sa danymi presetu, nie stala aplikacji.
+  els.renderDistance.disabled = !p.renderDistance || p.side === 'server';
 }
 
 function fillInstances(list) {
@@ -131,6 +144,12 @@ els.clearLog.addEventListener('click', () => { els.log.textContent = ''; });
 els.apply.addEventListener('click', doApply);
 els.revert.addEventListener('click', doRevert);
 els.refresh.addEventListener('click', () => doRefreshMods(false));
+els.expand.addEventListener('click', () => {
+  state.expandAll = !state.expandAll;
+  state.manualExpand.clear();
+  updateExpandBtn();
+  renderPlan();
+});
 document.querySelectorAll('[data-win]').forEach(b =>
   b.addEventListener('click', () => window.patcher.window(b.dataset.win)));
 
@@ -142,8 +161,10 @@ function debounce(fn, ms) {
 function options() {
   return {
     profile: state.profile,
-    renderDistance: Number(els.renderDistance.value) || 8,
-    xmx: Number(els.xmx.value) || 6144,
+    // Puste pole = "nie nadpisuj", a nie jakas wartosc z aplikacji: wartosci profili
+    // sa danymi presetu i tylko on ma prawo je znac.
+    renderDistance: Number(els.renderDistance.value) || undefined,
+    xmx: Number(els.xmx.value) || undefined,
     scan: els.scan.checked,
     force: false,
   };
@@ -180,8 +201,13 @@ async function refreshPlan() {
   els.warnings.innerHTML = res.warnings.map(w => `<div class="warn-item">${escapeHtml(w)}</div>`).join('');
 
   state.items = res.items;
-  // domyslnie zaznaczone jest to, co faktycznie jest do zrobienia
-  state.checked = new Set(res.items.filter(i => i.state === 'todo').map(i => i.id));
+  // Domyslnie zaznaczone jest to, co faktycznie jest do zrobienia I czego preset nie
+  // odznaczyl w tym profilu (np. narzedzie RAM jest odznaczone w profilu "high").
+  state.checked = new Set(res.items
+    .filter(i => i.state === 'todo' && i.selected !== false)
+    .map(i => i.id));
+  // nowy plan = inny zestaw pozycji, wiec reczne rozwiniecia przestaja mieć sens
+  state.manualExpand.clear();
   renderPlan();
 }
 
@@ -212,40 +238,67 @@ function renderPlan() {
   updateCounts();
 }
 
+/**
+ * Czy pozycja ma byc rozwinieta. Regula: rozwiniete jest to, co ZAZNACZONE - czyli
+ * to, co faktycznie sie wydarzy po kliknieciu. Zrobione, pominiete i odznaczone
+ * zwijaja sie do samego tytulu, zeby lista dala sie przeczytac jednym spojrzeniem.
+ * Wyjatek: bledu nie chowamy nigdy - niewidoczny blad jest gorszy niz balagan.
+ */
+function isExpanded(item) {
+  if (state.manualExpand.has(item.id)) return state.manualExpand.get(item.id);
+  if (state.expandAll) return true;
+  if (item.state === 'error') return true;
+  return state.checked.has(item.id);
+}
+
 function renderItem(item) {
-  {
-    const el = document.createElement('div');
-    el.className = 'item ' + item.state;
+  const el = document.createElement('div');
+  el.className = 'item ' + item.state + (isExpanded(item) ? '' : ' collapsed');
 
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.checked = state.checked.has(item.id);
-    // 'brak celu' tez da sie zaznaczyc - cel moze powstac przy wczesniejszej latce
-    box.disabled = item.state === 'skipped' || item.state === 'error';
-    box.addEventListener('change', () => {
-      box.checked ? state.checked.add(item.id) : state.checked.delete(item.id);
-      updateCounts();
-    });
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = state.checked.has(item.id);
+  // 'brak celu' tez da sie zaznaczyc - cel moze powstac przy wczesniejszej latce
+  box.disabled = item.state === 'skipped' || item.state === 'error';
+  box.addEventListener('change', () => {
+    box.checked ? state.checked.add(item.id) : state.checked.delete(item.id);
+    // Zaznaczenie wraca do reguly automatycznej: zaznaczone = rozwiniete.
+    state.manualExpand.delete(item.id);
+    el.classList.toggle('collapsed', !isExpanded(item));
+    updateCounts();
+  });
 
-    const body = document.createElement('div');
-    const lines = item.skipReason
-      ? `<div class="line missing"><span class="m">–</span><span>${escapeHtml(item.skipReason)}</span></div>`
-      : item.statuses.map(s =>
-          `<div class="line ${s.state}"><span class="m">${MARK[s.state] || ''}</span><span>${escapeHtml(s.text)}</span></div>`).join('');
+  const body = document.createElement('div');
+  const lines = item.skipReason
+    ? `<div class="line missing"><span class="m">–</span><span>${escapeHtml(item.skipReason)}</span></div>`
+    : item.statuses.map(s =>
+        `<div class="line ${s.state}"><span class="m">${MARK[s.state] || ''}</span><span>${escapeHtml(s.text)}</span></div>`).join('');
 
-    body.innerHTML =
-      `<div class="head">
-         <span class="title">${escapeHtml(item.title)}</span>
-         <span class="pill ${item.state}">${STATE_LABEL[item.state]}</span>
-         <span class="pill side">${SIDE_LABEL[item.side]}</span>
-       </div>
-       <div class="why">${escapeHtml(item.why || '')}</div>
-       <div class="lines">${lines}</div>
-       <div class="doc">${escapeHtml(item.doc)}</div>`;
+  body.innerHTML =
+    `<div class="head">
+       <span class="title">${escapeHtml(item.title)}</span>
+       <span class="pill ${item.state}">${STATE_LABEL[item.state]}</span>
+       <span class="pill side">${SIDE_LABEL[item.side]}</span>
+       <button class="toggle" type="button" title="Rozwin / zwin">
+         <svg viewBox="0 0 12 12"><path d="M3 4.5L6 8l3-3.5"/></svg>
+       </button>
+     </div>
+     <div class="why">${escapeHtml(item.why || '')}</div>
+     <div class="lines">${lines}</div>
+     <div class="doc">${escapeHtml(item.doc)}</div>`;
 
-    el.append(box, body);
-    els.plan.appendChild(el);
-  }
+  // Caly naglowek jest klikalny; checkbox lezy poza nim, wiec nic sie nie gryzie.
+  body.querySelector('.head').addEventListener('click', () => {
+    state.manualExpand.set(item.id, !isExpanded(item));
+    el.classList.toggle('collapsed', !isExpanded(item));
+  });
+
+  el.append(box, body);
+  els.plan.appendChild(el);
+}
+
+function updateExpandBtn() {
+  els.expand.textContent = state.expandAll ? 'Zwin zrobione' : 'Rozwin wszystko';
 }
 
 function updateCounts() {
@@ -257,6 +310,8 @@ function updateCounts() {
     ['skipped', by('skipped'), 'pominiete'],
     ['error', by('error'), 'blad'],
   ].filter(([, n]) => n > 0);
+  const hidden = state.items.filter(i => !isExpanded(i)).length;
+  if (hidden) chips.push(['collapsed', hidden, 'zwiniete']);
   els.counts.innerHTML = chips.map(([cls, n, label]) => `<span class="pill ${cls}">${n} ${label}</span>`).join('');
   els.apply.disabled = state.busy || state.checked.size === 0;
   els.apply.textContent = state.checked.size
@@ -298,9 +353,19 @@ async function doRefreshMods(quiet) {
   els.refresh.textContent = 'Sprawdzam...';
   if (!quiet) log('');
   const res = await window.patcher.refreshMods();
-  if (!res.ok) log('BLAD pobierania modow: ' + res.error);
+  if (!res.ok) log('BLAD sprawdzania repozytoriow: ' + res.error);
+
+  // Preset przynosi wlasne grupy i profile, wiec po pobraniu moga byc inne niz te,
+  // ktore okno dostalo przy starcie.
+  if (res.groups && res.groups.length) state.groups = res.groups;
+  if (res.profiles && Object.keys(res.profiles).length) {
+    state.profiles = res.profiles;
+    buildProfileSegments();
+    applyProfileDefaults(state.profile);
+  }
+
   els.refresh.disabled = false;
-  els.refresh.textContent = 'Sprawdz mody';
+  els.refresh.textContent = 'Sprawdz zrodla';
   refreshPlan();
 }
 

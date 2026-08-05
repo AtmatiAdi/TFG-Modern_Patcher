@@ -94,18 +94,27 @@ ipcMain.handle('window:action', (e, action) => {
 
 ipcMain.handle('app:info', () => ({
   version: app.getVersion(),
-  profiles: runner.PROFILES,
-  groups: patches.GROUPS,
+  profiles: runner.profiles(),
+  groups: patches.groups(),
+  usingPreset: patches.usingPreset(),
   sourcesFile: catalog.sourcesFile(),
 }));
 
-/** Pobranie wydan z repozytoriow wymienionych w sources.json. */
+/**
+ * Sprawdzenie repozytoriow z sources.json: mody (po tagach wydan) i configi
+ * (manifest preset-*.json). Grupy i profile moga sie po tym ZMIENIC - preset je
+ * przynosi - wiec odsylamy je razem z wynikiem.
+ */
 ipcMain.handle('catalog:refresh', async () => {
   try {
-    const mods = await catalog.refresh(msg => send('log', msg));
-    return { ok: true, mods };
+    const res = await catalog.refresh(msg => send('log', msg));
+    return { ok: true, mods: res.mods, presets: res.presets.length,
+             groups: patches.groups(), profiles: runner.profiles(),
+             usingPreset: patches.usingPreset() };
   } catch (e2) {
-    return { ok: false, error: e2.message, mods: catalog.resolved() };
+    return { ok: false, error: e2.message, mods: catalog.resolved(),
+             groups: patches.groups(), profiles: runner.profiles(),
+             usingPreset: patches.usingPreset() };
   }
 });
 

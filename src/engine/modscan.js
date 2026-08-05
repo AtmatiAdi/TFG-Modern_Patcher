@@ -1,7 +1,7 @@
 'use strict';
 // Skan ukrytych zaleznosci przed wylaczeniem moda.
 //
-// Zasada z docs/OPTIMIZATIONS-SPEC.md (sekcja "Czego NIE robic"): mods.toml NIE wystarcza - mod moze
+// Zasada z docs/CONTEXT.md: mods.toml NIE wystarcza - mod moze
 // odwolywac sie do klas innego moda bez deklarowania zaleznosci (sandworm_mod ->
 // aaa_particles wywalil gre). Dlatego przegladamy bajtkod.
 //

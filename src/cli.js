@@ -62,15 +62,21 @@ async function main() {
   if (args.refreshOnly) return 0;
 
   if (args.list) {
-    console.log('TFG Patcher - lista wprowadzanych zmian\n');
-    for (const g of patches.GROUPS) {
-      const inGroup = patches.all().filter(p => (p.group || 'optimizations') === g.id);
+    const opts = runner.defaults(args.profile);
+    const items = patches.all(opts, null);
+    console.log('TFG Patcher - lista wprowadzanych zmian');
+    console.log(patches.usingPreset()
+      ? 'Zrodlo: preset z repozytorium configow\n'
+      : 'Brak presetu - zadne repozytorium configow nie ma wydania z preset-*.json.\n'
+        + 'Plan pokazuje same mody.\n');
+    for (const g of patches.groups()) {
+      const inGroup = items.filter(p => (p.group || 'optimizations') === g.id);
       if (!inGroup.length) continue;
-      console.log(`== ${g.label.toUpperCase()} - ${g.description}`);
+      console.log(`== ${g.label.toUpperCase()} - ${g.description || ''}`);
       for (const p of inGroup) {
         console.log(`${p.id.padEnd(20)} [${p.side}]  ${p.title}`);
         console.log(`  dok: ${p.doc}`);
-        for (const c of p.changes) console.log('  - ' + c.describe(runner.defaults()));
+        for (const c of p.changes) console.log('  - ' + c.describe(opts));
       }
       console.log('');
     }
@@ -102,7 +108,7 @@ async function main() {
   const tag = { ok: '[ ZROBIONE]', todo: '[DO ZMIANY]', missing: '[BRAK CELU]', error: '[    BLAD ]', skipped: '[POMINIETE]' };
   const mark = { ok: 'ok  ', todo: '->  ', missing: '--  ', error: '!!  ' };
   let n = 0;
-  for (const g of patches.GROUPS) {
+  for (const g of patches.groups()) {
     const inGroup = items.filter(i => i.group === g.id);
     if (!inGroup.length) continue;
     console.log(`\n== ${g.label.toUpperCase()}`);
@@ -114,7 +120,9 @@ async function main() {
     }
   }
 
-  let ids = items.filter(i => i.state === 'todo').map(i => i.id);
+  // Domyslnie bierzemy to, co jest do zrobienia I co preset uznaje za zaznaczone
+  // w tym profilu (np. narzedzie RAM jest odznaczone w profilu "high").
+  let ids = items.filter(i => i.state === 'todo' && i.selected !== false).map(i => i.id);
   if (args.only) ids = ids.filter(id => args.only.includes(id));
   if (args.skip.length) ids = ids.filter(id => !args.skip.includes(id));
 

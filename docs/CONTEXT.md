@@ -5,19 +5,17 @@ Mówi, czym to jest, skąd się wzięło i czego **nie** wolno tu zmieniać bez 
 
 ---
 
-## Dwa repozytoria, dwie role
+## Trzy repozytoria, trzy role
 
 | Repo | Co w nim jest | Kiedy tu pracujesz |
 |---|---|---|
-| **repo z grą** (`TerraFirmaGreg-Modern_Optimisation`) | żywa instancja Prisma, źródła naszych modów (`mapatlas/`), dziennik optymalizacji, pełne dane pomiarowe | tworzenie modów, zmiana mechaniki, nowe pomiary RAM |
-| **to repo** (Patcher) | aplikacja nakładająca nasz stan na cudzą instancję albo serwer | zmiany w samym narzędziu, dołożenie źródła modów, nowa pozycja planu |
+| **to repo** (`TFG-Modern_Patcher`) | sam silnik: wykrywanie instancji, plan, operacje, cofanie | zmiany w narzędziu, format presetu, obsługa nowych operacji |
+| `TFG-Modern_atmatiadi_configs` | preset (`preset-*.json`), profile, narzędzia, shaderpack, śledztwo RAM | nowa optymalizacja, zmiana wartości profilu, nowe narzędzie |
+| `TFG-Modern_atmatiadi_mods` | wydania jarów po tagach `<mod>-<x.y.z>` | nowy mod albo nowa wersja moda |
 
-Podział wynika z tego, że repo z grą siedzi w katalogu instancji Prisma (żeby mieć
-pod ręką mody i dane gry), a Patcher ma trafiać do ludzi, którzy tej instancji nie mają.
-
-**Mody nie są tu kopiowane.** Patcher pobiera je z **wydań GitHuba** (`sources.json`),
-więc to repo nie musi wiedzieć nic o kodzie modów, a współpracownicy trzymają swoje
-mody u siebie. Szczegóły: `RELEASES.md`.
+**W tym repo nie ma ani jednej optymalizacji i ani jednej nazwy moda.** Wszystko przychodzi
+z wydań: mody rozpoznawane po tagach, configi z załącznika `preset-*.json`. Lista samych
+adresów siedzi w `sources.json`; szczegóły: `RELEASES.md`.
 
 ---
 
@@ -33,42 +31,23 @@ komentarze, kolejność i sposób zapisu pliku, bo nakładamy się na cudze usta
 
 ---
 
-## Dlaczego te konkretne optymalizacje — skrót śledztwa RAM
+## Dlaczego optymalizacji szukasz gdzie indziej
 
-Pełny zapis: `ram/FINDINGS.md` (chronologiczny) i `ram/HANDOFF.md` (brief).
-Tu tylko to, bez czego nie wolno ruszać listy zmian:
+**Tu ich nie ma i nie ma być.** Uzasadnienie każdej pozycji planu, pomiary RAM i lista
+„czego NIE robić" mieszkają w repozytorium configów:
 
-**Problem wyjściowy.** Proces gry brał **18,4 GB** przy 16 GB fizycznych → stronicowanie
-→ przycięcia co ~60 s. Heap `-Xmx` to była mniejszość tego rachunku.
+| Szukasz | Plik w `TFG-Modern_atmatiadi_configs` |
+|---|---|
+| po co jest dana pozycja planu | `docs/OPTIMIZATIONS-SPEC.md` |
+| pełny zapis śledztwa RAM | `docs/ram/FINDINGS.md` |
+| brief: stan śledztwa, co obalone | `docs/ram/HANDOFF.md` |
+| format manifestu (umowa obu stron) | `docs/PRESET-FORMAT.md` |
 
-**Ustalenie, które przestawiło projekt** (2026-07-22): RAM jest zjadany **przy ładowaniu
-modów**, nie w rozgrywce. Pomiar w menu głównym, po załadowaniu 255 modów i bez wczytanego
-świata, dał **13,1 GB commitu**. Czyli: mierz w menu głównym, nie w świecie — inaczej
-mierzysz szum.
-
-**Dowód na G1.** Garbage collector trzymał **3,8 GB pustej sterty** i nie oddawał jej
-systemowi. Flagi `MinHeapFreeRatio=10 / MaxHeapFreeRatio=30 / G1PeriodicGCInterval=15000`
-zbiły commit z **13,1 do 10,1 GB** — to najtańsze 3 GB w całym projekcie i dlatego
-`prism-jvm` jest pozycją, której nie wolno „uprościć".
-
-**Effekseer (`aaa_particles`).** Potwierdzone **1,03 GB** pamięci natywnej. Config `[gc]
-enabled=true` oddaje ją pod presją RAM.
-
-**renderDistance.** Największa gałka po stronie gry — dane i meshe chunków rosną
-kwadratowo. Stąd 8 jako standard i 24 dopiero z `Xmx 8192` (większy zasięg bez wyższego
-sufitu sterty tylko zagoniłby GC).
-
-**Czego NIE robić** (sprawdzone, kosztowało nas sesje):
-- **Nie włączać `ingredientDedupe` w AllTheLeaks** — wywala grę przy wejściu do świata
-  (`ATLUnsupportedOperation`). Pozycja `alltheleaks-guard` istnieje po to, żeby pilnować
-  wartości `false`, a nie żeby ją zmieniać.
-- **Nie wyłączać shaderów** — decyzja użytkownika, są wizualnie istotne. Wolno tylko
-  przycinać ich gałki pamięci (`shaders-light`).
-- **Nie dodawać `-XX:+AlwaysPreTouch`** — zarezerwowałoby całą stertę z góry.
-- **`mods.toml` NIE wystarcza** do wykrycia zależności między modami. Przed wyłączeniem
-  jakiegokolwiek moda trzeba przeskanować **constant pool** pozostałych jarów. Precedens:
-  `sandworm_mod` odwoływał się do `aaa_particles` bez wpisu w `mods.toml` i wyłączenie
-  wywaliło grę. Robi to `engine/modscan.js` i dlatego pozycja `xaero-off` ma skan.
+Jedyny ślad tamtej wiedzy, który **musi** zostać po tej stronie, to powód istnienia
+skanera bajtkodu: **`mods.toml` NIE wystarcza** do wykrycia zależności między modami.
+Precedens — `sandworm_mod` odwoływał się do `aaa_particles` bez wpisu w `mods.toml`
+i wyłączenie wywaliło grę. Dlatego `engine/modscan.js` czyta **constant pool** pozostałych
+jarów, a operacja `disableMods` ma w formacie presetu **obowiązkowe** `scan.tokens`.
 
 ---
 
@@ -84,24 +63,26 @@ sufitu sterty tylko zagoniłby GC).
   pozycja może dopiero utworzyć plik (shaderpack → plik ustawień shaderów).
 - **`signAndEditExecutable: false`** w `package.json` jest konieczne: archiwum winCodeSign
   zawiera dowiązania symboliczne macOS i electron-builder wywala się przy ich rozpakowaniu.
-- **Nie ustawiamy `fullscreen` ani `guiScale`** — to ustawienia osobiste gracza, nie
-  optymalizacje. Patcher dotyka dokładnie pięciu kluczy `options.txt`.
+- **Patcher nie ma własnego zdania o tym, co zmienić.** Dotyka wyłącznie kluczy
+  wymienionych w presecie — ani jednego więcej. Jeśli w planie brakuje jakiejś zmiany,
+  brakuje jej w manifeście, a nie w kodzie.
 
 ---
 
 ## Konwencje
 
 - Commity **po polsku**, krótko, na końcu:
-  `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
+  `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
 - Kod i komentarze w kodzie: **bez polskich znaków diakrytycznych** (konsola Windows).
   Dokumentacja w `docs/` — normalną polszczyzną.
 - Interfejs mówi po polsku, do użytkownika końcowego.
 - **Zero zależności runtime.** Aplikacja używa wyłącznie Node/Electrona: własny czytnik
   ZIP, własny klient HTTP na wbudowanym `https`, własny parser configów. To świadome —
   narzędzie ma się budować za pięć lat bez archeologii npm.
-- **Nowa optymalizacja = nowa pozycja w `engine/patches.js` + wpis w
-  `docs/OPTIMIZATIONS-SPEC.md`.** Pozycja bez uzasadnienia w dokumencie to pozycja,
-  której nikt za pół roku nie odważy się ruszyć.
+- **Nowa optymalizacja NIE jest zmianą w tym repo.** Idzie do presetu, razem z wpisem
+  w `OPTIMIZATIONS-SPEC.md` tamtego repozytorium. Pozycja bez uzasadnienia pomiarowego to
+  pozycja, której nikt za pół roku nie odważy się ruszyć. Tutaj dochodzi tylko wtedy, gdy
+  potrzebna jest **nowa operacja** (nowy `op` w `PRESET-FORMAT.md` i w `changes.js`).
 
 ---
 
@@ -110,6 +91,8 @@ sufitu sterty tylko zagoniłby GC).
 ```powershell
 pwsh -File build.ps1            # -> dist/TFG-Patcher-<wersja>.exe
 pwsh -File build.ps1 -SkipInstall
+pwsh -File release.ps1          # wydanie: pyta o numer, buduje, publikuje przez gh
+pwsh -File release.ps1 -DryRun  # samo sprawdzenie, bez ruszania package.json
 node src\cli.js --list          # co aplikacja wprowadza, grupami
 node src\cli.js --refresh       # samo pobranie wydan do cache
 node src\cli.js -i <sciezka>    # plan bez zmian
@@ -127,8 +110,7 @@ Zmienne środowiskowe przydatne przy pracy:
 | Zmienna | Do czego |
 |---|---|
 | `TFG_SOURCES_FILE` | inny `sources.json` (testy bez ruszania repo) |
-| `TFG_CACHE_DIR` | inny katalog cache |
-| `TFG_ASSETS_DIR` | inny katalog zasobów |
+| `TFG_CACHE_DIR` | inny katalog cache (tam lądują pobrane jary i załączniki presetu) |
 | `TFG_GITHUB_TOKEN` | token do repo prywatnych i wyższych limitów |
 | `TFG_UI_DUMP=<plik>` | zrzut układu interfejsu i elementów wychodzących poza okno |
 | `TFG_UI_SHOT=<plik>` | zrzut ekranu okna (razem z `TFG_UI_DUMP`) |
@@ -137,8 +119,14 @@ Zmienne środowiskowe przydatne przy pracy:
 
 ## Co jest zaplanowane, a czego jeszcze nie ma
 
-- Grupa **„Programy wspierające"** istnieje w kodzie (`patches.js` → `GROUPS`), ale nie
-  ma w niej żadnej pozycji. Ma tam trafić m.in. narzędzie wymuszające zwalnianie RAM
-  w systemie — użytkownik ma własne, gotowe rozwiązanie do pokazania.
-- Model „wielu współpracowników, każdy z własnym repo" jest już obsłużony przez
-  `sources.json`; na razie wpisany jest jeden mod (nasz).
+- **Wydzielenie zakończone (2026-08-05).** Aplikacja nie zawiera żadnej optymalizacji,
+  żadnej nazwy moda ani żadnego zasobu. `patches.js` buduje plan z presetu, `runner.js`
+  bierze profile z presetu, `assets/` już nie ma. Zostały dwa osobne projekty:
+  `TFG-Modern_atmatiadi_configs` (preset) i `TFG-Modern_atmatiadi_mods` (jary).
+- **Umowa z repozytorium configów: `PRESET-FORMAT.md`** — kopia leży w tamtym repo,
+  w `docs/`. Zmiana formatu to zmiana obu stron naraz i podbicie `formatVersion`.
+- **Bez presetu plan pokazuje same mody.** To poprawny stan, nie awaria — repozytorium
+  configów bez wydania po prostu nic nie wnosi.
+- Model „wielu współpracowników, każdy z własnym repo" obsługuje `sources.json` plus plik
+  użytkownika w `%LOCALAPPDATA%\TFG-Patcher\sources.json` — dopisanie cudzego repozytorium
+  nie wymaga nowej wersji aplikacji.

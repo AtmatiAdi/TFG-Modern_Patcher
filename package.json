@@ -1,7 +1,7 @@
 {
   "name": "tfg-patcher",
-  "version": "3.0.0",
-  "description": "Naklada nasz stan (optymalizacje, mody z wydan GitHuba, shadery, argumenty Prisma) na wskazana instancje TerraFirmaGreg-Modern albo serwer",
+  "version": "3.1.0",
+  "description": "Naklada na wskazana instancje albo serwer stan pobrany z wydan: configi z repozytorium presetow, mody wykryte po tagach wydan",
   "main": "src/main.js",
   "author": "TFG optimization project",
   "license": "UNLICENSED",
@@ -22,7 +22,6 @@
     "directories": { "output": "dist" },
     "files": ["src/**/*", "package.json"],
     "extraResources": [
-      { "from": "assets", "to": "assets" },
       { "from": "sources.json", "to": "sources.json" }
     ],
     "win": {
