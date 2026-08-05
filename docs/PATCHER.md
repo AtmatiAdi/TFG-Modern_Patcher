@@ -143,11 +143,11 @@ src/
   main.js            proces glowny Electrona: okno bez ramki + IPC
   preload.js         most do UI (contextIsolation, brak node w oknie)
   cli.js             ten sam silnik z konsoli - serwery, takze Linux
-  ui/                index.html, style.css (liquid glass), app.js
+  ui/                index.html, style.css (liquid glass), app.js, ring.gif
   engine/
     instance.js      wykrycie instancji Prisma / katalogu gry / serwera, lista instancji
-    patches.js       PELNA lista pozycji + definicja grup
-    changes.js       elementarne operacje: setKey, setJson, installFile, disableMods
+    patches.js       zlozenie planu: pozycje z presetu + mody wykryte w repozytoriach
+    changes.js       operacje: setKey, setJson, installFile, installArchive, disableMods
     textconfig.js    chirurgiczna edycja toml / properties / options.txt / ini
     runner.js        profile, budowa planu, wykonanie
     journal.js       kopie zapasowe i cofanie
@@ -157,11 +157,14 @@ src/
     preset.js        wczytanie i WALIDACJA manifestu configow
     compile.js       manifest -> pozycje planu (zmienne, sciezki, operacje)
     release.js       klient GitHub Releases + cache
-    assets.js        pliki dolaczone do aplikacji (shaderpack)
     zip.js           wlasny czytnik ZIP (EOCD + inflateRaw)
-assets/shaderpacks/  pakiet shaderow i jego ustawienia
-sources.json         katalog modow pobieranych z wydan
+sources.json         rejestr repozytoriow (mods / configs) - jedyny plik danych w exe
+build.ps1            budowa -> dist/TFG-Patcher-<wersja>.exe
+release.ps1          wydanie: pyta o numer, buduje, publikuje przez gh
 ```
+
+Do `.exe` wchodzi `src/` i `sources.json`. **Ani jednego zasobu** — shaderpack,
+narzędzia i mody pobierają się z wydań.
 
 ---
 
