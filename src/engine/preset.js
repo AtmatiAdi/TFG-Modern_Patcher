@@ -150,7 +150,7 @@ function validate(m) {
       }
     }
   }
-  if (!itemIds.size && !Array.isArray(m.modSources)) err('preset', 'brak "items"');
+  if (!itemIds.size) err('preset', 'brak "items"');
 
   strings(m.items || [], 'items', (text, where) => {
     for (const name of varsIn(text)) if (!known.has(name)) err(where, `nieznana zmienna {${name}}`);

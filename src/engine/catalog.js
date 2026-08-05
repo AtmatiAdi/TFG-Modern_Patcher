@@ -287,7 +287,7 @@ async function refresh(log = () => {}) {
   saveState();
 
   if (!presets.length) {
-    log('Nie ma zadnego presetu - plan pokaze wbudowana liste optymalizacji.');
+    log('Nie ma zadnego presetu - plan pokaze same mody.');
   }
   return { mods: resolvedMods, presets: resolvedPresets };
 }

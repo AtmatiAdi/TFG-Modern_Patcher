@@ -109,6 +109,7 @@ node src\cli.js --refresh   # samo pobranie wydan do cache
 | **`docs/CONTEXT.md`** | **zacznij tutaj** — po co to jest, konwencje, czego nie ruszać |
 | `docs/PATCHER.md` | architektura, struktura kodu, pułapki |
 | `docs/RELEASES.md` | jak wydawać mody i preset, żeby Patcher je zobaczył |
+| **`docs/DLA-WSPOLPRACOWNIKOW.md`** | **do wysłania osobie z zewnątrz** — samodzielny opis: jak udostępniać swoje mody i configi, czego Patcher szuka, jak sprawdzić, że działa |
 
 Uzasadnienia optymalizacji i pomiary RAM **nie leżą w tym repo** — są tam, gdzie
 powstają, czyli w `TFG-Modern_atmatiadi_configs` (`docs/OPTIMIZATIONS-SPEC.md`,
