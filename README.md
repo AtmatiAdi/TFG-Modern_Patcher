@@ -103,7 +103,12 @@ Wymaga `gh` zalogowanego przez `gh auth login`.
 npm start                   # okno bez pakowania
 node src\cli.js --list      # co aplikacja wprowadza, grupami
 node src\cli.js --refresh   # samo pobranie wydan do cache
+npm run icon                # przerysowanie ikony z siatki w build/make-icon.js
 ```
+
+Ikona — pixelowy blok lapis lazuli — jest **kodem, nie wrzuconą binarką**: siatka 16×16
+na początku `build/make-icon.js`, reszta to składanie `.ico` na wbudowanym `zlib`.
+`build.ps1` generuje ją przy każdej budowie, więc nie ma jak zostać w tyle.
 
 | Dokument | O czym |
 |---|---|

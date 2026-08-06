@@ -28,7 +28,15 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "npm install zwrocil $LASTEXITCODE" }
   }
 
-  # --- 2. build ---------------------------------------------------------------
+  # --- 2. ikona ---------------------------------------------------------------
+  # Przegenerowana przy KAZDEJ budowie, choc build/icon.ico jest w repozytorium. Wynik
+  # jest deterministyczny, wiec nic to nie brudzi, a poprawka w siatce ART nie ma jak
+  # zostac w tyle za wydanym .exe.
+  Write-Host "Generuje ikone..."
+  node (Join-Path $root 'build/make-icon.js')
+  if ($LASTEXITCODE -ne 0) { throw "make-icon.js zwrocil $LASTEXITCODE" }
+
+  # --- 3. build ---------------------------------------------------------------
   if ($DirOnly) {
     Write-Host "Pakuje (tylko katalog)..."
     npx electron-builder --win dir --publish never

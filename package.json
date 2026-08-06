@@ -1,6 +1,6 @@
 {
   "name": "tfg-patcher",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "Naklada na wskazana instancje albo serwer stan pobrany z wydan: configi z repozytorium presetow, mody wykryte po tagach wydan",
   "main": "src/main.js",
   "author": "TFG optimization project",
@@ -10,7 +10,8 @@
     "start": "electron .",
     "cli": "node src/cli.js",
     "refresh": "node src/cli.js --refresh",
-    "dist": "electron-builder --win portable --publish never"
+    "dist": "electron-builder --win portable --publish never",
+    "icon": "node build/make-icon.js"
   },
   "devDependencies": {
     "electron": "^33.2.0",
@@ -22,11 +23,13 @@
     "directories": { "output": "dist" },
     "files": ["src/**/*", "package.json"],
     "extraResources": [
-      { "from": "sources.json", "to": "sources.json" }
+      { "from": "sources.json", "to": "sources.json" },
+      { "from": "build/icon.ico", "to": "icon.ico" }
     ],
     "win": {
       "target": [{ "target": "portable", "arch": ["x64"] }],
       "artifactName": "TFG-Patcher-${version}.exe",
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false
     },
     "portable": { "artifactName": "TFG-Patcher-${version}.exe" },

@@ -2,6 +2,7 @@
 // Proces glowny Electrona: okno bez ramki (wlasny pasek tytulu) + IPC do silnika.
 
 const { app, BrowserWindow, ipcMain, dialog, shell, screen } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const instanceLib = require('./engine/instance');
 const runner = require('./engine/runner');
@@ -18,9 +19,20 @@ function createWindow() {
   const width = Math.min(1420, Math.max(900, Math.round(work.width * 0.86)));
   const height = Math.min(920, Math.max(600, Math.round(work.height * 0.88)));
 
+  // Ikone USTAWIAMY W OKNIE, a nie zostawiamy plikowi wykonywalnemu: rcedit, ktory
+  // stemplowalby exe, jest wylaczony przez signAndEditExecutable=false (patrz
+  // docs/PATCHER.md - inaczej electron-builder wywala sie na archiwum winCodeSign).
+  // Bez tego pasek zadan i Alt+Tab pokazywalyby domyslne logo Electrona.
+  // Sciezki jak przy sources.json: w paczce resources, w repo build/.
+  const icon = [
+    process.resourcesPath ? path.join(process.resourcesPath, 'icon.ico') : null,
+    path.join(__dirname, '..', 'build', 'icon.ico'),
+  ].filter(Boolean).find(p => fs.existsSync(p));
+
   win = new BrowserWindow({
     width,
     height,
+    ...(icon ? { icon } : {}),
     minWidth: 720,
     minHeight: 560,
     frame: false,

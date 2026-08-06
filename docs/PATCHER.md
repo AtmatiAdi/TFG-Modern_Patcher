@@ -178,12 +178,24 @@ src/
     release.js       klient GitHub Releases + cache
     zip.js           wlasny czytnik ZIP (EOCD + inflateRaw)
 sources.json         rejestr repozytoriow (jedna lista) - jedyny plik danych w exe
+build/
+  make-icon.js       generator ikony: siatka 16x16 -> icon.ico (+ icon.png do podgladu)
+  icon.ico           wynik generatora, w repo dla `npm run dist` i `npm start`
 build.ps1            budowa -> dist/TFG-Patcher-<wersja>.exe
 release.ps1          wydanie: pyta o numer, buduje, publikuje przez gh
 ```
 
-Do `.exe` wchodzi `src/` i `sources.json`. **Ani jednego zasobu** — shaderpack,
-narzędzia i mody pobierają się z wydań.
+Do `.exe` wchodzi `src/`, `sources.json` i `icon.ico`. **Ani jednego zasobu gry** —
+shaderpack, narzędzia i mody pobierają się z wydań.
+
+**Ikona jest kodem, nie wrzuconą binarką.** Rysuje ją `build/make-icon.js` z siatki 16×16
+na początku pliku — pixelowy blok lapis lazuli — i sam składa `.ico` (sześć rozmiarów:
+16, 32, 48 jako DIB, 64, 128, 256 jako PNG, bo PNG w ICO rozumie dopiero Vista). Używa
+wyłącznie wbudowanego `zlib`, zgodnie z zasadą zera zależności. Skalowanie idzie metodą
+najbliższego sąsiada i **tylko o całkowitą krotność**, stąd brak 24 i 40 px — wymagałyby
+połówek pikseli. `build.ps1` przegenerowuje ikonę przy każdej budowie (wynik jest
+deterministyczny, więc git tego nie zauważy), żeby poprawka w siatce nie została w tyle
+za wydanym `.exe`. Ręcznie: `npm run icon`.
 
 ---
 
@@ -191,7 +203,13 @@ narzędzia i mody pobierają się z wydań.
 
 - **`signAndEditExecutable: false`** w `package.json` jest konieczne: archiwum winCodeSign
   zawiera dowiązania symboliczne macOS i electron-builder wywala się przy rozpakowaniu.
-  Skutek uboczny: nie da się podmienić ikony exe (rcedit jest wtedy wyłączony).
+  Skutek uboczny: **rcedit jest wyłączony**, więc `win.icon` nie trafia do wewnętrznego
+  `win-unpacked/TFG-Patcher.exe` — ten zostaje z logo Electrona. Ikonę widać mimo to
+  w obu miejscach, które ogląda użytkownik, i **każde bierze ją inną drogą**:
+  plik do pobrania stempluje NSIS budujący stub portable (sprawdzone: wszystkie sześć
+  rozmiarów, ze 256 włącznie), a pasek zadań i Alt+Tab biorą ją z **okna** — `main.js`
+  ustawia `icon` z `resources/icon.ico`. Usunięcie którejkolwiek z tych dwóch rzeczy
+  zostawia domyślne logo Electrona w połowie systemu.
 - **`ELECTRON_RUN_AS_NODE`** odziedziczone z powłoki VS Code sprawia, że zbudowany exe
   kończy się natychmiast. To artefakt środowiska, nie błąd aplikacji.
 - **Zrzut ekranu okna z zewnątrz** kadruje je przy skalowaniu DPI. Do diagnostyki układu
