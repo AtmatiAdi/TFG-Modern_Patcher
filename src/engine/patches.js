@@ -2,9 +2,12 @@
 // Lista pozycji planu. Aplikacja NIE ZNA ani jednej optymalizacji i ani jednego moda -
 // jedno i drugie czyta z wydan repozytoriow wymienionych w sources.json:
 //
-//  1. PRESET z repozytorium configow - optymalizacje, profile, shaderpack, narzedzia.
+//  1. PRESETY - optymalizacje, pliki gry (configi, kubejs), shaderpack, narzedzia.
 //     Manifest jest DANYMI (docs/PRESET-FORMAT.md), zamienia go na operacje compile.js.
 //  2. MODY wykryte w repozytoriach po tagach wydan (discover.js).
+//
+// Presetow moze byc kilka - po jednym z kazdego repozytorium, ktore go wydalo.
+// Sklada sie je w jeden plan, wiec kolizja id pozycji musi byc rozstrzygnieta tutaj.
 //
 // Brak presetu nie jest bledem: plan pokazuje wtedy same mody i mowi, czego brakuje.
 
@@ -32,8 +35,11 @@ function globToRe(glob) {
  */
 function wireAssets() {
   compile.setAssetLookup({
-    preset: mask => {
-      for (const p of catalog.presets()) {
+    // Szukamy w zalacznikach TEGO presetu. Bez repo (stara sciezka wywolania)
+    // przegladamy wszystkie - inaczej plan zamilklby bez powodu.
+    preset: (mask, repo) => {
+      const scope = repo ? catalog.presets().filter(p => p.repo === repo) : catalog.presets();
+      for (const p of scope) {
         const hit = (p.assets || []).find(a => globToRe(mask).test(path.basename(a)));
         if (hit) return hit;
       }
@@ -61,6 +67,7 @@ function modItems(group) {
     return {
       id: 'mod-' + mod.id,
       group,
+      source: mod.repo,
       side: mod.side || 'both',
       title: `${mod.name || mod.id} ${mod.version || ''}`.trim(),
       doc: mod.repo,
@@ -87,7 +94,7 @@ function groups() {
   return fromPresets.length ? fromPresets : FALLBACK_GROUPS;
 }
 
-/** Profile: z presetow. null = zadne repozytorium configow nie dostarczylo profili. */
+/** Profile: z presetow. null = zaden preset nie dostarczyl profili. */
 function profiles() {
   const fromPresets = compile.profilesFrom(manifests());
   return Object.keys(fromPresets).length ? fromPresets : null;
@@ -95,6 +102,26 @@ function profiles() {
 
 function usingPreset() {
   return manifests().length > 0;
+}
+
+/**
+ * Id pozycji jest kluczem: po nim idzie zaznaczenie w oknie, --only i --skip.
+ * Dwa presety moga niezaleznie nazwac pozycje tak samo, wiec drugiemu dopisujemy
+ * autora repozytorium. Wyrzucenie kolizji byloby gorsze - pozycja zniknelaby
+ * z planu bez sladu, a to wyglada jak poprawne dzialanie.
+ */
+function uniqueIds(items) {
+  const seen = new Set();
+  for (const it of items) {
+    if (!seen.has(it.id)) { seen.add(it.id); continue; }
+    const owner = String(it.source || '').split('/')[0].toLowerCase();
+    let id = owner ? `${it.id}@${owner}` : it.id + '-2';
+    for (let n = 2; seen.has(id); n++) id = `${it.id}@${owner || 'x'}-${n}`;
+    it.why = (it.why ? it.why + ' ' : '') + `(id zmienione z "${it.id}" - kolizja z innym presetem)`;
+    it.id = id;
+    seen.add(id);
+  }
+  return items;
 }
 
 /**
@@ -106,8 +133,10 @@ function all(opts = { profile: 'standard' }, inst = null) {
   wireAssets();
   const gs = groups();
   const modGroup = (gs.find(g => g.id === 'mods') || gs[0]).id;
-  const fromPresets = manifests().flatMap(m => compile.compile(m, opts, inst));
-  return [...fromPresets, ...modItems(modGroup)];
+  const fromPresets = catalog.presets().flatMap(p =>
+    compile.compile(p.manifest, opts, inst, { repo: p.repo })
+      .map(item => ({ ...item, source: p.repo })));
+  return uniqueIds([...fromPresets, ...modItems(modGroup)]);
 }
 
 module.exports = { all, groups, profiles, usingPreset, FALLBACK_GROUPS };

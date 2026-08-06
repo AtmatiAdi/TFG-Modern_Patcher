@@ -67,8 +67,8 @@ function log(msg) {
 
   log('TFG Patcher ' + info.version + ' - repozytoria zrodlowe: ' + info.sourcesFile);
   log(info.usingPreset
-    ? 'Optymalizacje z presetu pobranego z repozytorium configow.'
-    : 'Brak presetu - zadne repozytorium configow nie ma wydania z preset-*.json. '
+    ? 'Optymalizacje i pliki gry z presetow pobranych z repozytoriow.'
+    : 'Brak presetu - zadne repozytorium nie ma wydania z preset-*.json. '
       + 'Plan pokazuje same mody.');
   log('Plan odswieza sie sam. Zaznacz pozycje i kliknij "Zastosuj zaznaczone".');
   refreshPlan();

@@ -40,20 +40,25 @@ function cmpVersion(a, b) {
  * Mody wyczytane z wydan repozytorium - po jednym wpisie na moda, zawsze najnowszy.
  *
  * @param {Array} releases wynik release.listReleases()
- * @param {{prerelease?:boolean, only?:string[], except?:string[]}} opts
+ * @param {{prerelease?:boolean, only?:string[], except?:string[], quietTags?:string[]}} opts
  * @returns {{mods:Array, skipped:string[]}}
  */
 function mods(releases, opts = {}) {
-  const { prerelease = false, only = null, except = null } = opts;
+  const { prerelease = false, only = null, except = null, quietTags = [] } = opts;
   const best = new Map();
   const skipped = [];
 
+  // Wydania, ktore w tym repozytorium PELNIA INNA ROLE (np. niosa preset). Nie sa
+  // modem i nie sa bledem, wiec zglaszanie ich jako "pominieto" tylko myli.
+  const quiet = new Set(quietTags);
+  const skip = (tag, why) => { if (!quiet.has(tag)) skipped.push(`${tag} (${why})`); };
+
   for (const rel of releases || []) {
-    if (rel.draft) { skipped.push(`${rel.tag} (draft)`); continue; }
-    if (rel.prerelease && !prerelease) { skipped.push(`${rel.tag} (prerelease)`); continue; }
+    if (rel.draft) { skip(rel.tag, 'draft'); continue; }
+    if (rel.prerelease && !prerelease) { skip(rel.tag, 'prerelease'); continue; }
 
     const parsed = parseTag(rel.tag);
-    if (!parsed) { skipped.push(`${rel.tag} (tag nie pasuje do <mod>-<x.y.z>)`); continue; }
+    if (!parsed) { skip(rel.tag, 'tag nie pasuje do <mod>-<x.y.z>'); continue; }
     if (only && only.length && !only.includes(parsed.mod)) continue;
     if (except && except.includes(parsed.mod)) continue;
 
@@ -61,7 +66,7 @@ function mods(releases, opts = {}) {
     const jars = (rel.assets || []).filter(a => a.name.toLowerCase().endsWith('.jar'));
     const own = jars.filter(a => a.name.toLowerCase().startsWith(parsed.mod));
     const assets = own.length ? own : jars;
-    if (!assets.length) { skipped.push(`${rel.tag} (brak zalacznika .jar)`); continue; }
+    if (!assets.length) { skip(rel.tag, 'brak zalacznika .jar'); continue; }
 
     const prev = best.get(parsed.mod);
     if (prev && cmpVersion(prev.version, parsed.version) >= 0) continue;

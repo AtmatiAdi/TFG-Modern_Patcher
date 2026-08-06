@@ -4,10 +4,17 @@ Patcher nie zna żadnego moda ani żadnej optymalizacji „na sztywno". Zna **re
 (`sources.json`) i pyta GitHuba, co w nich jest. Dołożenie moda albo zmiana configów to
 wydanie na GitHubie — nie zmiana w tej aplikacji i nie nowy `.exe`.
 
-| Rodzaj źródła | Czego Patcher szuka | Kto to wydaje |
-|---|---|---|
-| `mods` | wydań o tagu `<mod>-<x.y.z>` z załącznikiem `.jar` | repo z modami |
-| `configs` | najnowszego wydania z załącznikiem `preset-*.json` | repo z configami |
+**Repozytorium nie ma rodzaju.** Każde z `sources.json` jest sprawdzane pod obie
+konwencje naraz, więc jedno repo może wydawać mody, configi albo jedno i drugie:
+
+| Co wydajesz | Czego Patcher szuka |
+|---|---|
+| **mod** | wydania o tagu `<mod>-<x.y.z>` z załącznikiem `.jar` |
+| **configi i pliki gry** | najnowszego wydania z załącznikiem `preset-*.json` |
+
+Podział na `mods` i `configs` istniał wcześniej i był błędny: autor wydający jednocześnie
+mody i pliki gry (kubejs, configi) musiałby prowadzić dwa repozytoria albo pogodzić się
+z tym, że połowa jego pracy jest niewidoczna.
 
 ---
 
@@ -57,6 +64,9 @@ Tyle. Następne uruchomienie Patchera (albo przycisk **Sprawdź źródła**) pob
   moda w `mods/` to crash gry.
 - **Pierwsza linia notatek wydania** trafia do planu jako opis pozycji. Autor moda nie
   musi niczego dopisywać w żadnym innym repozytorium.
+- **Ten sam mod w dwóch repozytoriach** to jedna pozycja, nie dwie: wygrywa wyższa wersja,
+  a log mówi, skąd została wzięta. Dwa wpisy o tej samej nazwie byłyby nie do pogodzenia —
+  oba usuwałyby jara tego drugiego przy tej samej masce `<mod>-*.jar`.
 
 ### Bez `gh` (przez stronę)
 
@@ -68,8 +78,18 @@ załączników → *Publish release*.
 ## 2. Wydanie configów (presetu)
 
 Preset to **jeden plik** `preset-<wersja>.json` jako załącznik wydania, plus załączniki,
-do których się odwołuje (shaderpack, zzipowane narzędzia). Patcher bierze **najnowsze**
-wydanie zawierające taki plik — presety się nie sumują.
+do których się odwołuje (shaderpack, zzipowane narzędzia, paczka plików gry). Z każdego
+repozytorium Patcher bierze **najnowsze** wydanie zawierające taki plik — presety tego
+samego autora się nie sumują, nowszy zastępuje starszy.
+
+Presety **różnych** repozytoriów sumują się już jak najbardziej: ich grupy i pozycje
+składają się w jeden plan. Profile są wspólne — wygrywa pierwszy preset, który je
+przynosi (kolejność z `sources.json`), więc preset dokładający same pliki nie powinien
+w ogóle deklarować profili. Gdy dwa presety nadadzą pozycji to samo `id`, drugie
+w kolejności dostaje dopisek `@<autor>`, żeby nic nie zniknęło po cichu.
+
+Tag wydania z presetem (`preset-3.0.0`) wygląda jak tag moda, ale bez załącznika `.jar`
+nie zostanie za moda wzięty — i nie jest z tego powodu zgłaszany w logu jako pominięty.
 
 Instrukcja i skrypt pakujący są po tamtej stronie:
 `TFG-Modern_atmatiadi_configs/docs/RELEASING.md` (`pwsh -File build/pack.ps1 -Release`).
@@ -87,8 +107,9 @@ Lepiej brak pozycji niż połowa wykonanej optymalizacji.
 
 ```json
 {
-  "mods":    [ { "repo": "wlasciciel/repo-z-modami", "label": "Mody X", "side": "both" } ],
-  "configs": [ { "repo": "wlasciciel/repo-z-configami", "label": "Configi X" } ]
+  "repos": [
+    { "repo": "wlasciciel/repo", "label": "Nazwa w logu", "side": "both" }
+  ]
 }
 ```
 
@@ -97,6 +118,12 @@ Lepiej brak pozycji niż połowa wykonanej optymalizacji.
 | `repo` | `wlasciciel/repozytorium` na GitHubie — jedyne pole obowiązkowe |
 | `label` | nazwa źródła w logu i w planie |
 | `side` | `client`, `server` albo `both` — gdzie mody z tego repo mają sens |
+| `only` / `except` | lista nazw modów do wzięcia / pominięcia |
+| `prerelease` | `true`, jeśli prereleasy też mają się liczyć |
+
+Jeden wpis obejmuje **wszystko**, co repozytorium wydaje — mody i preset. Stare klucze
+`mods` i `configs` są nadal czytane (nic nie trzeba przepisywać) i wpadają do tej samej
+listy.
 
 **Bez ruszania aplikacji** dopisuje się je w pliku użytkownika:
 `%LOCALAPPDATA%\TFG-Patcher\sources.json` — ten sam format, doklejany do wbudowanego

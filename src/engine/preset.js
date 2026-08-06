@@ -88,8 +88,12 @@ function validate(m) {
     if (p.side && !SIDES.includes(p.side)) err(`profiles[${i}]`, 'zle "side"');
     for (const k of Object.keys(p.vars || {})) profileVars.add(k);
   }
-  if (!profileIds.size) err('preset', 'brak profili');
-  else if (defaults !== 1) err('profiles', `dokladnie jeden profil ma miec "default": true (jest ${defaults})`);
+  // Profile sa OPCJONALNE i celowo: preset dokladajacy same pliki (kubejs, configi
+  // jednego autora) nie ma czego profilowac, a profile i tak sa wspolne dla calego
+  // planu - narzuca je preset, ktory je przynosi.
+  if (profileIds.size && defaults !== 1) {
+    err('profiles', `dokladnie jeden profil ma miec "default": true (jest ${defaults})`);
+  }
 
   const known = new Set([
     ...Object.keys(m.vars || {}).filter(k => !k.startsWith('_')),
@@ -113,7 +117,11 @@ function validate(m) {
         err(w, '"selected" musi byc true/false albo obiektem {profil: bool}');
       } else {
         for (const [key, value] of Object.entries(item.selected)) {
-          if (key !== '*' && !profileIds.has(key)) err(w, `"selected" wskazuje nieznany profil "${key}"`);
+          // Nazwy profili sprawdzamy tylko wtedy, gdy TEN preset je definiuje.
+          // Preset bez profili moze sie odwolac do cudzych (np. "server": false).
+          if (profileIds.size && key !== '*' && !profileIds.has(key)) {
+            err(w, `"selected" wskazuje nieznany profil "${key}"`);
+          }
           if (typeof value !== 'boolean') err(w, `"selected.${key}" musi byc true albo false`);
         }
       }

@@ -9,6 +9,11 @@
 // Zna repozytoria (sources.json) i dwie konwencje wydan:
 //   mody    - tag <mod>-<x.y.z>, zalacznik .jar
 //   configi - zalacznik preset-*.json (manifest, docs/PRESET-FORMAT.md)
+//
+// Repozytorium NIE MA rodzaju: kazde jest sprawdzane pod obie konwencje naraz.
+// Podzial na "mods" i "configs" istnial wczesniej i byl bledny - wspolpracownik
+// wydajacy mody I pliki gry (kubejs, configi) musialby trzymac dwa repozytoria
+// albo wybrac, ktora polowe jego wydan Patcher zobaczy.
 
 const fs = require('fs');
 const path = require('path');
@@ -47,9 +52,17 @@ function readJson(file) {
   }
 }
 
+function list(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 /**
- * Zrodla wbudowane + dopisane przez uzytkownika. Powtorzone repozytorium liczy sie raz -
- * inaczej ten sam mod pojawilby sie w planie dwa razy.
+ * Zrodla wbudowane + dopisane przez uzytkownika, w JEDNEJ liscie. Powtorzone
+ * repozytorium liczy sie raz - inaczej ten sam mod pojawilby sie w planie dwa razy.
+ *
+ * "mods" i "configs" to stary podzial. Czytamy je nadal, bo lezy w plikach
+ * uzytkownika (%LOCALAPPDATA%\TFG-Patcher\sources.json) i w starszych wydaniach,
+ * ale wpadaja do tej samej listy - rodzaj repozytorium przestal cokolwiek znaczyc.
  */
 function sources() {
   if (sourcesCache) return sourcesCache;
@@ -57,17 +70,15 @@ function sources() {
   const builtin = readJson(sourcesFile());
   const user = fs.existsSync(userSourcesFile()) ? readJson(userSourcesFile()) : null;
 
-  const out = { mods: [], configs: [], error: null, userFile: user ? userSourcesFile() : null };
+  const out = { repos: [], error: null, userFile: user ? userSourcesFile() : null };
   if (!builtin) out.error = 'nie da sie wczytac ' + sourcesFile();
 
   for (const part of [builtin, user]) {
     if (!part) continue;
-    for (const kind of ['mods', 'configs']) {
-      for (const src of Array.isArray(part[kind]) ? part[kind] : []) {
-        if (!src || !src.repo) continue;
-        if (out[kind].some(s => s.repo.toLowerCase() === String(src.repo).toLowerCase())) continue;
-        out[kind].push(src);
-      }
+    for (const src of [...list(part.repos), ...list(part.mods), ...list(part.configs)]) {
+      if (!src || !src.repo) continue;
+      if (out.repos.some(s => s.repo.toLowerCase() === String(src.repo).toLowerCase())) continue;
+      out.repos.push(src);
     }
   }
   sourcesCache = out;
@@ -86,8 +97,8 @@ function saveState() {
     fs.writeFileSync(statePath(), JSON.stringify({
       refreshed: new Date().toISOString(),
       mods: resolvedMods,
-      presets: resolvedPresets.map(p => ({ repo: p.repo, tag: p.tag, file: p.file,
-                                           assets: p.assets || [] })),
+      presets: resolvedPresets.map(p => ({ repo: p.repo, label: p.label, tag: p.tag,
+                                           file: p.file, assets: p.assets || [] })),
     }, null, 2));
   } catch { /* cache jest wygoda, nie warunkiem dzialania */ }
 }
@@ -121,21 +132,44 @@ function loadCached() {
 
 // ------------------------------------------------------------------ odswiezenie
 
-/** Jedno zrodlo modow: lista wydan -> mody -> pliki w cache. */
-async function refreshModRepo(src, log) {
+/**
+ * Jedno repozytorium: JEDNO zapytanie o liste wydan, po czym te same wydania
+ * sprawdzamy pod obie konwencje. Repo moze przyniesc same mody, sam preset albo
+ * jedno i drugie - nikt nie deklaruje z gory, co tam jest.
+ */
+async function refreshRepo(src, log) {
+  const label = src.label || src.repo;
   const releases = await release.listReleases(src.repo, log);
+
+  const hit = discover.presetRelease(releases);
   const found = discover.mods(releases, {
     prerelease: Boolean(src.prerelease),
     only: src.only || null,
     except: src.except || null,
+    // Wydanie presetu ma tag w rodzaju "preset-3.0.0", wiec wyglada jak mod bez jara.
+    // Bez tego kazde odswiezenie repozytorium z configami konczyloby sie "pominieto".
+    quietTags: hit ? [hit.release.tag] : [],
   });
 
-  log(`  ${src.label || src.repo}: ${releases.length} wydan -> ${found.mods.length} modow`);
+  const summary = [`${found.mods.length} modow`];
+  if (hit) summary.push(`preset w ${hit.release.tag}`);
+  log(`  ${label}: ${releases.length} wydan -> ${summary.join(', ')}`);
   for (const s of found.skipped.slice(0, 5)) log(`      pominieto ${s}`);
   if (found.skipped.length > 5) log(`      ...oraz ${found.skipped.length - 5} innych`);
 
+  return { mods: await fetchMods(src, found.mods, log),
+           preset: hit ? await fetchPreset(src, hit, log) : null };
+}
+
+/**
+ * Mody wykryte w wydaniach -> pliki w cache.
+ *
+ * `src.mods` (obiekt w POJEDYNCZYM wpisie zrodla, nie stara lista) to nadpisania
+ * dla konkretnego moda: {"mapatlas": {"name": ..., "side": ..., "why": ...}}.
+ */
+async function fetchMods(src, mods, log) {
   const out = [];
-  for (const mod of found.mods) {
+  for (const mod of mods) {
     const files = [];
     for (const asset of mod.assets) {
       files.push(await release.fetchAsset(src.repo, mod.tag, asset, log));
@@ -159,29 +193,22 @@ async function refreshModRepo(src, log) {
   return out;
 }
 
-/** Jedno zrodlo configow: najnowsze wydanie z preset-*.json -> zwalidowany manifest. */
-async function refreshConfigRepo(src, log) {
-  const releases = await release.listReleases(src.repo, log);
-  const hit = discover.presetRelease(releases);
-  if (!hit) {
-    // Repozytorium bez wydan to normalny stan swiezego repo, nie awaria.
-    log(`  ${src.label || src.repo}: brak wydania z zalacznikiem preset-*.json`);
-    return null;
-  }
-
+/** Wydanie z preset-*.json -> zwalidowany manifest + pliki, na ktore wskazuje. */
+async function fetchPreset(src, hit, log) {
+  const label = src.label || src.repo;
   const file = await release.fetchAsset(src.repo, hit.release.tag, hit.asset, log);
   const parsed = preset.load(file);
   if (!parsed.ok) {
     // Uszkodzony preset odrzucamy W CALOSCI - lepiej pokazac blad, niz wykonac polowe.
-    log(`  ${src.label || src.repo}: preset ${hit.release.tag} ODRZUCONY`);
+    log(`      preset ${hit.release.tag} ODRZUCONY`);
     for (const e of parsed.errors.slice(0, 6)) log(`      ${e}`);
     return null;
   }
-  log(`  ${src.label || src.repo}: preset ${parsed.manifest.name} ${parsed.manifest.version}`
+  log(`      preset ${parsed.manifest.name} ${parsed.manifest.version}`
     + ` (${(parsed.manifest.items || []).length} pozycji)`);
 
   const assets = await fetchPresetAssets(src.repo, hit.release, parsed.manifest, log);
-  return { repo: src.repo, tag: hit.release.tag, file, assets,
+  return { repo: src.repo, label, tag: hit.release.tag, file, assets,
            manifest: parsed.manifest, from: 'release' };
 }
 
@@ -232,9 +259,28 @@ async function fetchPresetAssets(repo, rel, manifest, log) {
 }
 
 /**
- * Odpytuje kazde zrodlo i dociaga brakujace pliki.
- * Bledy sa lokalne: zrodlo, ktore nie odpowiedzialo, zostaje przy wersji z cache,
- * a reszta katalogu dziala normalnie.
+ * Ten sam mod z dwoch repozytoriow - wygrywa wyzsza wersja.
+ *
+ * Odkad kazde repozytorium moze wydawac mody, kolizja przestala byc teoretyczna.
+ * Dwa wpisy o tym samym id sa nie do pogodzenia: oba instaluja plik pasujacy do
+ * tego samego replaceGlob, wiec kazdy kasowalby jara tego drugiego.
+ */
+function dedupeMods(mods, log) {
+  const best = new Map();
+  for (const mod of mods) {
+    const prev = best.get(mod.id);
+    if (!prev) { best.set(mod.id, mod); continue; }
+    const win = discover.cmpVersion(mod.version || '0', prev.version || '0') > 0 ? mod : prev;
+    log(`  UWAGA: ${mod.id} jest w dwoch zrodlach (${prev.sourceLabel} ${prev.version},`
+      + ` ${mod.sourceLabel} ${mod.version}) - biore ${win.version} z ${win.sourceLabel}`);
+    best.set(mod.id, win);
+  }
+  return [...best.values()];
+}
+
+/**
+ * Odpytuje kazde repozytorium i dociaga brakujace pliki.
+ * Bledy sa lokalne: repozytorium, ktore nie odpowiedzialo, nie psuje pozostalych.
  */
 async function refresh(log = () => {}) {
   const src = sources();
@@ -242,52 +288,43 @@ async function refresh(log = () => {}) {
   if (src.userFile) log('Zrodla uzytkownika: ' + src.userFile);
 
   const before = { mods: resolvedMods, presets: resolvedPresets };
-  if (!src.mods.length && !src.configs.length) {
+  if (!src.repos.length) {
     log('sources.json nie wymienia zadnych repozytoriow.');
     resolvedMods = [];
     resolvedPresets = [];
     return { mods: resolvedMods, presets: resolvedPresets };
   }
 
-  log(`Sprawdzam repozytoria (${src.mods.length} z modami, ${src.configs.length} z configami)`
-    + `${release.token() ? ' [token]' : ''}...`);
+  log(`Sprawdzam repozytoria (${src.repos.length})${release.token() ? ' [token]' : ''}...`);
 
   const mods = [];
-  for (const s of src.mods) {
-    try {
-      mods.push(...await refreshModRepo(s, log));
-    } catch (e) {
-      const kept = before.mods.filter(m => m.repo === s.repo);
-      mods.push(...kept.map(m => ({ ...m, from: 'cache', error: e.message })));
-      log(`  ${s.label || s.repo}: ${e.message}`
-        + (kept.length ? ` - zostaje ${kept.length} z cache` : ' - BRAK modow'));
-    }
-  }
-
   const presets = [];
-  for (const s of src.configs) {
+  for (const s of src.repos) {
     try {
-      const hit = await refreshConfigRepo(s, log);
-      if (hit) presets.push(hit);
-      else {
-        const kept = before.presets.find(p => p.repo === s.repo);
-        if (kept) presets.push(kept);
-      }
+      const res = await refreshRepo(s, log);
+      mods.push(...res.mods);
+      if (res.preset) presets.push(res.preset);
     } catch (e) {
-      const kept = before.presets.find(p => p.repo === s.repo);
-      if (kept) presets.push({ ...kept, from: 'cache', error: e.message });
+      // Zrodlo, ktore nie odpowiedzialo, zostaje przy tym, co juz lezy w cache.
+      // Repozytorium, ktore odpowiedzialo i nic nie ma, po prostu nic nie wnosi.
+      const keptMods = before.mods.filter(m => m.repo === s.repo);
+      const keptPreset = before.presets.find(p => p.repo === s.repo);
+      mods.push(...keptMods.map(m => ({ ...m, from: 'cache', error: e.message })));
+      if (keptPreset) presets.push({ ...keptPreset, from: 'cache', error: e.message });
+      const kept = [keptMods.length ? `${keptMods.length} modow` : null,
+                    keptPreset ? 'preset' : null].filter(Boolean);
       log(`  ${s.label || s.repo}: ${e.message}`
-        + (kept ? ' - zostaje preset z cache' : ' - BRAK presetu'));
+        + (kept.length ? ` - zostaje ${kept.join(' i ')} z cache` : ' - NIC z tego zrodla'));
     }
   }
 
-  resolvedMods = mods;
+  resolvedMods = dedupeMods(mods, log);
   resolvedPresets = presets;
   lastRefresh = new Date();
   saveState();
 
   if (!presets.length) {
-    log('Nie ma zadnego presetu - plan pokaze same mody.');
+    log('Zadne repozytorium nie wydalo presetu - plan pokaze same mody.');
   }
   return { mods: resolvedMods, presets: resolvedPresets };
 }

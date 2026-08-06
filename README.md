@@ -120,25 +120,36 @@ wydanie nowego `preset-*.json`. Jedno i drugie bez zmian w kodzie i bez nowego `
 
 ---
 
-## Skąd się biorą mody
+## Skąd się biorą mody i configi
 
 Patcher **nie zna żadnego moda ani żadnej optymalizacji**. Zna repozytoria — `sources.json`
 wymienia same adresy:
 
 ```json
 {
-  "mods":    [ { "repo": "AtmatiAdi/TFG-Modern_atmatiadi_mods" } ],
-  "configs": [ { "repo": "AtmatiAdi/TFG-Modern_atmatiadi_configs" } ]
+  "repos": [
+    { "repo": "AtmatiAdi/TFG-Modern_atmatiadi_mods" },
+    { "repo": "AtmatiAdi/TFG-Modern_atmatiadi_configs" },
+    { "repo": "Scepeczki/TFG-Modern_scepeczki_mods" }
+  ]
 }
 ```
+
+**Jedna lista — repozytorium nie ma rodzaju.** Każde jest sprawdzane pod obie konwencje,
+więc jeden autor może w jednym repo wydawać mody, configi i pliki gry naraz:
 
 **Mody** rozpoznaje po tagach wydań (`<mod>-<x.y.z>`, np. `mapatlas-0.4.0`): grupuje po
 nazwie moda i bierze najwyższą wersję każdego. Wydanie jara wystarczy — nowy mod pojawia
 się w planie u wszystkich, bez nowej wersji aplikacji.
 
-**Configi** czyta z załącznika `preset-*.json` w najnowszym wydaniu repozytorium configów.
-Manifest opisuje optymalizacje, profile maszyn i shaderpack. Zmiana `renderDistance` to
-nowe wydanie presetu, nie nowy `.exe`.
+**Configi** czyta z załącznika `preset-*.json` w najnowszym wydaniu danego repozytorium.
+Manifest opisuje optymalizacje, profile maszyn, shaderpack i pliki do wgrania (configi,
+KubeJS, resourcepacki). Presety różnych autorów **składają się w jeden plan**. Zmiana
+`renderDistance` to nowe wydanie presetu, nie nowy `.exe`.
+
+Patcher **niczego nie uruchamia** z cudzego repozytorium: kopiowanie plików opisuje
+manifest, a wykonuje je zamknięty słownik operacji, ograniczony do katalogu instancji
+i odwracalny.
 
 Własne repozytoria dopisuje się bez ruszania aplikacji, w
 `%LOCALAPPDATA%\TFG-Patcher\sources.json`. Repozytorium musi być **publiczne** — na

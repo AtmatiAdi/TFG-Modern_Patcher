@@ -7,7 +7,7 @@ const patches = require('./patches');
 /**
  * Profile sa DANYMI presetu: aplikacja zna tylko POJECIE profilu (selektor w oknie,
  * wykrycie serwera, reczne nadpisanie galek), a nazwy i wartosci przychodza
- * z repozytorium configow.
+ * z presetu.
  *
  * To jest jedyny profil wbudowany i celowo nie niesie zadnej wartosci optymalizacyjnej -
  * istnieje po to, zeby okno mialo co pokazac, zanim jakikolwiek preset zostanie pobrany.

@@ -110,9 +110,9 @@ ipcMain.handle('app:info', () => ({
 }));
 
 /**
- * Sprawdzenie repozytoriow z sources.json: mody (po tagach wydan) i configi
- * (manifest preset-*.json). Grupy i profile moga sie po tym ZMIENIC - preset je
- * przynosi - wiec odsylamy je razem z wynikiem.
+ * Sprawdzenie repozytoriow z sources.json. Kazde jest pytane o jedno i drugie:
+ * mody (po tagach wydan) i configi (manifest preset-*.json). Grupy i profile moga
+ * sie po tym ZMIENIC - preset je przynosi - wiec odsylamy je razem z wynikiem.
  */
 ipcMain.handle('catalog:refresh', async () => {
   try {

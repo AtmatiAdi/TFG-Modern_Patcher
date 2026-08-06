@@ -66,8 +66,8 @@ async function main() {
     const items = patches.all(opts, null);
     console.log('TFG Patcher - lista wprowadzanych zmian');
     console.log(patches.usingPreset()
-      ? 'Zrodlo: preset z repozytorium configow\n'
-      : 'Brak presetu - zadne repozytorium configow nie ma wydania z preset-*.json.\n'
+      ? 'Zrodlo: presety pobrane z repozytoriow\n'
+      : 'Brak presetu - zadne repozytorium nie ma wydania z preset-*.json.\n'
         + 'Plan pokazuje same mody.\n');
     for (const g of patches.groups()) {
       const inGroup = items.filter(p => (p.group || 'optimizations') === g.id);

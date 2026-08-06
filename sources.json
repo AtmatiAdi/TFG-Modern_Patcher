@@ -4,12 +4,19 @@
     "optymalizacji - te Patcher wyczytuje z wydan, wiec nowy mod albo nowa wersja",
     "configow NIE wymaga nowej wersji aplikacji.",
     "",
-    "mods    - Patcher przeglada wydania i rozklada tagi wg konwencji <mod>-<x.y.z>,",
-    "          grupuje po nazwie moda i bierze najwyzsza wersje kazdego.",
-    "          Wydanie 'mapatlas-0.4.0' z zalacznikiem 'mapatlas-0.4.0.jar' wystarczy.",
+    "Jedna lista. Repozytorium NIE MA rodzaju - kazde jest sprawdzane pod obie",
+    "konwencje naraz i moze przyniesc mody, pliki gry albo jedno i drugie:",
     "",
-    "configs - Patcher szuka najnowszego wydania z zalacznikiem 'preset-*.json'.",
-    "          Manifest opisuje optymalizacje, profile i shaderpack (docs/PRESET-FORMAT.md).",
+    "  MODY    - wydania o tagu <mod>-<x.y.z> z zalacznikiem .jar. Patcher grupuje",
+    "            po nazwie moda i bierze najwyzsza wersje kazdego. Wydanie",
+    "            'mapatlas-0.4.0' z zalacznikiem 'mapatlas-0.4.0.jar' wystarczy.",
+    "",
+    "  CONFIGI - najnowsze wydanie z zalacznikiem 'preset-*.json'. Manifest opisuje",
+    "            optymalizacje i pliki do wgrania - configi, kubejs, shaderpacki,",
+    "            narzedzia (docs/PRESET-FORMAT.md).",
+    "",
+    "Pola opcjonalne wpisu: label (nazwa w logu), side (client/server/both dla modow),",
+    "prerelease (true = brac tez przedwydania), only/except (lista nazw modow).",
     "",
     "Wlasne zrodla mozna dopisac BEZ ruszania aplikacji, w pliku uzytkownika:",
     "  %LOCALAPPDATA%\\TFG-Patcher\\sources.json     (ten sam format, dokladany do tego)",
@@ -18,23 +25,20 @@
     "anonimowego Patchera u odbiorcy po prostu nie istnieje."
   ],
 
-  "mods": [
+  "repos": [
     {
       "repo": "AtmatiAdi/TFG-Modern_atmatiadi_mods",
       "label": "Mody AtmatiAdi",
       "side": "both"
     },
     {
-      "repo": "Scepeczki/TFG-Modern_scepeczki_mods",
-      "label": "Mody Scepeczki",
-      "side": "both"
-    }
-  ],
-
-  "configs": [
-    {
       "repo": "AtmatiAdi/TFG-Modern_atmatiadi_configs",
       "label": "Configi AtmatiAdi"
+    },
+    {
+      "repo": "Scepeczki/TFG-Modern_scepeczki_mods",
+      "label": "Scepeczki",
+      "side": "both"
     }
   ]
 }

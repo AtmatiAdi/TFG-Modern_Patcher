@@ -41,6 +41,20 @@ function resolveTarget(inst, rel) {
   return full;
 }
 
+/**
+ * Sciezka z manifestu -> to, co widac w planie. Katalog glowny da sie zapisac na
+ * kilka sposobow (".", "@instance/", ""), a kazdy z nich po obcieciu przedrostka
+ * zostawialby pusta etykiete albo samotna kropke - czyli linie planu bez informacji.
+ */
+function pathLabel(rel) {
+  const raw = String(rel);
+  const clean = raw.replace(/^@(instance|tools)\/?/, '').replace(/^\.\/?/, '');
+  if (clean) return clean;
+  return raw.startsWith('@instance') ? 'w katalogu instancji'
+    : raw.startsWith('@tools') ? 'w katalogu narzedzi'
+      : 'w katalogu gry';
+}
+
 /** Wartosc zmiennej: lista skleja sie spacjami (dlugie listy flag czyta sie w diffie). */
 function varValue(v) {
   return Array.isArray(v) ? v.join(' ') : String(v);
@@ -88,7 +102,7 @@ function defaultSelected(item, profileId) {
   return true;
 }
 
-function change(op, vars, inst) {
+function change(op, vars, inst, source) {
   const file = () => i => resolveTarget(i, subst(op.file, vars));
   const label = String(op.file || op.target || '').replace(/^@\w+\//, '');
 
@@ -107,7 +121,9 @@ function change(op, vars, inst) {
   }
   if (op.op === 'installAsset' || op.op === 'installRelease') {
     const wanted = subst(op.asset, vars);
-    const found = (op.op === 'installAsset' ? presetAssets : releaseAssets)(op, wanted);
+    const found = op.op === 'installAsset'
+      ? presetAssets(wanted, source)
+      : releaseAssets(op, wanted);
     const targetRel = subst(op.target, vars);
     const name = found ? path.basename(found) : path.basename(targetRel);
 
@@ -115,7 +131,7 @@ function change(op, vars, inst) {
       return installArchive({
         resource: fileResource(found, found ? null : `nie pobrano zalacznika "${wanted}"`),
         target: i => resolveTarget(i, targetRel),
-        label: targetRel.replace(/^@\w+\//, ''),
+        label: pathLabel(targetRel),
         onlyIfMissing: Boolean(op.onlyIfMissing),
       });
     }
@@ -125,7 +141,7 @@ function change(op, vars, inst) {
         const dest = resolveTarget(i, targetRel);
         return targetRel.endsWith('/') ? path.join(dest, name) : dest;
       },
-      label: targetRel.replace(/^@\w+\//, ''),
+      label: pathLabel(targetRel),
       replaceGlob: op.replaceGlob ? subst(op.replaceGlob, vars) : null,
       onlyIfMissing: Boolean(op.onlyIfMissing),
     });
@@ -137,18 +153,22 @@ function change(op, vars, inst) {
 }
 
 // Zalaczniki wydania presetu i cudzych wydan podstawia catalog - tu tylko odczyt.
+// "installAsset" pyta o zalacznik WLASNEGO wydania, wiec szuka sie go w repozytorium
+// tego presetu, a nie gdziekolwiek - inaczej maska "kubejs.zip" u jednego autora
+// trafialaby w plik drugiego.
 let assetLookup = { preset: () => null, release: () => null };
 function setAssetLookup(lookup) { assetLookup = { ...assetLookup, ...lookup }; }
-function presetAssets(op, wanted) { return assetLookup.preset(wanted); }
+function presetAssets(wanted, source) { return assetLookup.preset(wanted, source && source.repo); }
 function releaseAssets(op, wanted) { return assetLookup.release(op.repo, wanted); }
 
 /**
  * @param {object} manifest zwalidowany manifest
  * @param {object} opts     wynik runner.defaults() - potrzebny profil
  * @param {object} inst     instancja (do rozwiniecia sciezek); moze byc null przy --list
+ * @param {object} source   skad ten preset przyszedl ({repo}) - do szukania zalacznikow
  * @returns {Array} pozycje planu w formacie patches.js
  */
-function compile(manifest, opts, inst) {
+function compile(manifest, opts, inst, source = null) {
   const profile = (manifest.profiles || []).find(p => p.id === opts.profile)
     || (manifest.profiles || []).find(p => p.default)
     || (manifest.profiles || [])[0];
@@ -165,7 +185,7 @@ function compile(manifest, opts, inst) {
         doc: item.doc || manifest.docs || manifest.id,
         why: item.why ? subst(item.why, vars) : '',
         selected: defaultSelected(item, (profile && profile.id) || opts.profile),
-        changes: item.changes.map(op => change(op, vars, inst)),
+        changes: item.changes.map(op => change(op, vars, inst, source)),
       });
     } catch (e) {
       // Jedna zla pozycja nie moze wywalic calego planu - pokazujemy ja jako blad.

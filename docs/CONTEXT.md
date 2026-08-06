@@ -5,17 +5,23 @@ Mówi, czym to jest, skąd się wzięło i czego **nie** wolno tu zmieniać bez 
 
 ---
 
-## Trzy repozytoria, trzy role
+## Repozytoria i role
 
 | Repo | Co w nim jest | Kiedy tu pracujesz |
 |---|---|---|
 | **to repo** (`TFG-Modern_Patcher`) | sam silnik: wykrywanie instancji, plan, operacje, cofanie | zmiany w narzędziu, format presetu, obsługa nowych operacji |
 | `TFG-Modern_atmatiadi_configs` | preset (`preset-*.json`), profile, narzędzia, shaderpack, śledztwo RAM | nowa optymalizacja, zmiana wartości profilu, nowe narzędzie |
 | `TFG-Modern_atmatiadi_mods` | wydania jarów po tagach `<mod>-<x.y.z>` | nowy mod albo nowa wersja moda |
+| repozytoria współpracowników | mody i/lub preset z plikami gry | nigdy — to cudza własność, wpinamy sam adres |
 
 **W tym repo nie ma ani jednej optymalizacji i ani jednej nazwy moda.** Wszystko przychodzi
 z wydań: mody rozpoznawane po tagach, configi z załącznika `preset-*.json`. Lista samych
 adresów siedzi w `sources.json`; szczegóły: `RELEASES.md`.
+
+**Repozytorium nie ma rodzaju.** `sources.json` to jedna lista, a każdy adres jest pytany
+o jedno i drugie. Podział na `mods` i `configs` był błędem projektowym: wymuszał na autorze
+wydającym mody **i** pliki gry (KubeJS, configi) prowadzenie dwóch repozytoriów. Stare
+klucze są nadal czytane, żeby pliki użytkowników nie przestały działać.
 
 ---
 
@@ -126,7 +132,19 @@ Zmienne środowiskowe przydatne przy pracy:
 - **Umowa z repozytorium configów: `PRESET-FORMAT.md`** — kopia leży w tamtym repo,
   w `docs/`. Zmiana formatu to zmiana obu stron naraz i podbicie `formatVersion`.
 - **Bez presetu plan pokazuje same mody.** To poprawny stan, nie awaria — repozytorium
-  configów bez wydania po prostu nic nie wnosi.
+  bez wydania z presetem po prostu nic nie wnosi.
 - Model „wielu współpracowników, każdy z własnym repo" obsługuje `sources.json` plus plik
   użytkownika w `%LOCALAPPDATA%\TFG-Patcher\sources.json` — dopisanie cudzego repozytorium
-  nie wymaga nowej wersji aplikacji.
+  nie wymaga nowej wersji aplikacji. Dokument do wysłania takiej osobie (albo jej agentowi):
+  `docs/DLA-WSPOLPRACOWNIKOW.md`.
+- **Presety się składają, ale nie zlewają** (2026-08-06). Każde repozytorium wnosi swój
+  preset; grupy i pozycje sumują się w jednym planie. Rozstrzygnięte kolizje: profile —
+  wygrywa pierwszy preset z danym `id`; `id` pozycji — drugie w kolejności dostaje dopisek
+  `@<autor>`; ten sam mod w dwóch repozytoriach — wygrywa wyższa wersja. Profile są
+  **opcjonalne**, bo preset dokładający same pliki nie ma czego profilować.
+  `formatVersion` **zostaje 1**: rozluźnienie walidacji nie unieważnia żadnego istniejącego
+  manifestu, a starszy Patcher odrzuci manifest bez profili z czytelnym błędem — nie ma
+  przed czym chronić podbiciem. Bump należy się dopiero nowej **operacji**.
+- **Patcher nie uruchamia niczego z cudzego repozytorium** i nie ma tego robić. Prośba
+  „a niech odpali skrypt instalacyjny autora" ma odpowiedź: `installAsset` + `unpack`,
+  bo to samo robi w granicach instancji, odwracalnie i widocznie w planie.

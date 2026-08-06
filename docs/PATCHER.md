@@ -27,10 +27,10 @@ to już nie tutaj, tylko w repozytorium configów (`docs/OPTIMIZATIONS-SPEC.md`,
 ## Przepływ
 
 ```
-sources.json (REPOZYTORIA, nie mody)
+sources.json (REPOZYTORIA, nie mody - jedna lista, repo nie ma rodzaju)
       │
-      ├─ mods:    listReleases ─► discover.mods()  ─► jary w cache
-      └─ configs: listReleases ─► preset-*.json    ─► manifest + zalaczniki w cache
+      └─ dla KAZDEGO repo: listReleases ─┬─► discover.mods()      ─► jary w cache
+                        │                └─► preset-*.json        ─► manifest + zalaczniki
                         │                (catalog.refresh - jedyna siec, na zadanie)
                         ▼
                   compile(manifest) ──┐
@@ -40,6 +40,11 @@ instance.detect(dir) ─────────────────┘     
                                                                           ▼
                                                     runner.apply() ─► journal ─► .tfg-patcher/
 ```
+
+Jedno zapytanie na repozytorium, dwie konwencje odczytu. Presety **kilku** repozytoriów
+składają się w jeden plan (`patches.all`), więc kolizje muszą być rozstrzygnięte właśnie
+tam: `id` pozycji dostaje dopisek `@<autor>`, profile bierze pierwszy preset, który je
+przynosi, a ten sam mod z dwóch źródeł redukuje `catalog.dedupeMods` do wyższej wersji.
 
 Aplikacja nie zawiera **ani jednej** nazwy moda i **ani jednej** wartości configu.
 `compile.js` zamienia manifest na dokładnie te same obiekty operacji, których silnik
@@ -121,9 +126,9 @@ wykonanie, chyba że `--force`). Efekt na naszej paczce: 255 modów, 0 twardych,
 
 ## Dodanie nowej pozycji planu — nie tutaj
 
-Pozycja planu to wpis w `preset.json` w repozytorium configów, a nie zmiana w kodzie.
-**W tym repo nie dopisuje się optymalizacji.** Tutaj przychodzisz tylko wtedy, gdy
-istniejące operacje nie wystarczają:
+Pozycja planu to wpis w `preset-*.json` w repozytorium, które ją wydaje — swoim albo
+współpracownika — a nie zmiana w kodzie. **W tym repo nie dopisuje się optymalizacji.**
+Tutaj przychodzisz tylko wtedy, gdy istniejące operacje nie wystarczają:
 
 1. Nowy rodzaj operacji — dopisz go w `engine/changes.js` (musi mieć `describe`, `check`
    i `apply` z zapisem do dziennika), podepnij w `engine/compile.js` i dodaj do listy
@@ -158,7 +163,7 @@ src/
     compile.js       manifest -> pozycje planu (zmienne, sciezki, operacje)
     release.js       klient GitHub Releases + cache
     zip.js           wlasny czytnik ZIP (EOCD + inflateRaw)
-sources.json         rejestr repozytoriow (mods / configs) - jedyny plik danych w exe
+sources.json         rejestr repozytoriow (jedna lista) - jedyny plik danych w exe
 build.ps1            budowa -> dist/TFG-Patcher-<wersja>.exe
 release.ps1          wydanie: pyta o numer, buduje, publikuje przez gh
 ```
