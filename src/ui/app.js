@@ -33,9 +33,9 @@ const state = {
   checked: new Set(),
   busy: false,
   planToken: 0,
-  // Zwijanie: domyslnie rozwiniete jest to, co zaznaczone (czyli to, co sie wydarzy).
-  // manualExpand trzyma recznie wymuszony stan pojedynczych pozycji - kasowany przy
-  // nowym planie, bo wtedy zmienia sie sam zestaw pozycji.
+  // Zwijanie: KAZDA pozycja startuje zwinieta, niezaleznie od stanu. manualExpand
+  // trzyma recznie rozwiniete pozycje - kasowany przy nowym planie, bo wtedy zmienia
+  // sie sam zestaw pozycji.
   manualExpand: new Map(),
   expandAll: false,
 };
@@ -239,16 +239,13 @@ function renderPlan() {
 }
 
 /**
- * Czy pozycja ma byc rozwinieta. Regula: rozwiniete jest to, co ZAZNACZONE - czyli
- * to, co faktycznie sie wydarzy po kliknieciu. Zrobione, pominiete i odznaczone
- * zwijaja sie do samego tytulu, zeby lista dala sie przeczytac jednym spojrzeniem.
- * Wyjatek: bledu nie chowamy nigdy - niewidoczny blad jest gorszy niz balagan.
+ * Czy pozycja ma byc rozwinieta. Regula jest jedna i nie zalezy od stanu pozycji:
+ * wszystko startuje ZWINIETE, do samego tytulu ze znacznikiem stanu. Szczegoly
+ * rozwija ten, kto ich chce - klikiem w naglowek albo "Rozwin wszystko".
  */
 function isExpanded(item) {
   if (state.manualExpand.has(item.id)) return state.manualExpand.get(item.id);
-  if (state.expandAll) return true;
-  if (item.state === 'error') return true;
-  return state.checked.has(item.id);
+  return state.expandAll;
 }
 
 function renderItem(item) {
@@ -260,11 +257,10 @@ function renderItem(item) {
   box.checked = state.checked.has(item.id);
   // 'brak celu' tez da sie zaznaczyc - cel moze powstac przy wczesniejszej latce
   box.disabled = item.state === 'skipped' || item.state === 'error';
+  // Zaznaczenie nie rusza zwijania: zwiniecie pozycji, ktora ktos wlasnie rozwinal,
+  // zeby jej sie przyjrzec przed kliknieciem, bylo by wyrwaniem jej sprzed oczu.
   box.addEventListener('change', () => {
     box.checked ? state.checked.add(item.id) : state.checked.delete(item.id);
-    // Zaznaczenie wraca do reguly automatycznej: zaznaczone = rozwiniete.
-    state.manualExpand.delete(item.id);
-    el.classList.toggle('collapsed', !isExpanded(item));
     updateCounts();
   });
 
@@ -276,8 +272,8 @@ function renderItem(item) {
 
   body.innerHTML =
     `<div class="head">
+       <span class="pill state ${item.state}">${STATE_LABEL[item.state]}</span>
        <span class="title">${escapeHtml(item.title)}</span>
-       <span class="pill ${item.state}">${STATE_LABEL[item.state]}</span>
        <span class="pill side">${SIDE_LABEL[item.side]}</span>
        <button class="toggle" type="button" title="Rozwin / zwin">
          <svg viewBox="0 0 12 12"><path d="M3 4.5L6 8l3-3.5"/></svg>
@@ -298,7 +294,7 @@ function renderItem(item) {
 }
 
 function updateExpandBtn() {
-  els.expand.textContent = state.expandAll ? 'Zwin zrobione' : 'Rozwin wszystko';
+  els.expand.textContent = state.expandAll ? 'Zwin wszystko' : 'Rozwin wszystko';
 }
 
 function updateCounts() {
@@ -310,8 +306,7 @@ function updateCounts() {
     ['skipped', by('skipped'), 'pominiete'],
     ['error', by('error'), 'blad'],
   ].filter(([, n]) => n > 0);
-  const hidden = state.items.filter(i => !isExpanded(i)).length;
-  if (hidden) chips.push(['collapsed', hidden, 'zwiniete']);
+  // Licznika zwinietych juz nie ma: skoro zwiniete jest wszystko, ta liczba nic nie mowi.
   els.counts.innerHTML = chips.map(([cls, n, label]) => `<span class="pill ${cls}">${n} ${label}</span>`).join('');
   els.apply.disabled = state.busy || state.checked.size === 0;
   els.apply.textContent = state.checked.size

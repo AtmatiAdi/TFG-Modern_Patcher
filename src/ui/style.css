@@ -269,7 +269,7 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: not-allowed; }
 .item.skipped, .item.missing { opacity: .45; }
 .item.error { border-left: 2px solid var(--err); }
 
-/* ---- zwijanie: zrobione i odznaczone kurcza sie do samego tytulu ---------- */
+/* ---- zwijanie: kazda pozycja startuje zwinieta, do samego tytulu ---------- */
 .item.collapsed { padding: 8px 15px; }
 .item.collapsed .why,
 .item.collapsed .lines,
@@ -287,10 +287,11 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: not-allowed; }
 }
 .toggle:hover { background: rgba(255,255,255,.09); color: var(--txt); }
 
-.pill.collapsed { color: var(--txt-faint); background: rgba(255,255,255,.05); border-color: var(--edge-soft); }
-
 .item > div { min-width: 0; }
 .item .head { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; cursor: pointer; }
+/* Stan idzie PRZED tytulem, w stalej szerokosci - inaczej tytuly zaczynalyby sie
+   w innym miejscu w kazdym wierszu i kolumna przestalaby byc kolumna. */
+.item .head .pill.state { flex: none; min-width: 82px; text-align: center; }
 .item .title { font-weight: 600; color: var(--txt); overflow-wrap: anywhere; }
 .item .why { font-size: 11.5px; color: var(--txt-faint); margin-top: 3px; overflow-wrap: anywhere; }
 .item .doc { font-size: 10.5px; color: var(--txt-faint); margin-top: 6px; }

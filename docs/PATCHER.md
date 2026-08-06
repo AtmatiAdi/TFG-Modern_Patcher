@@ -57,12 +57,17 @@ pliku configu) · `error` · `skipped` (nie dotyczy tej strony: klient/serwer).
 pozycja zależna od poprzedniej wyglądałaby na „brak celu": shaderpack dopiero tworzy plik
 ustawień, który zmienia pozycja `shaders-light`.
 
-**Zwijanie pozycji w oknie.** Reguła jest jedna: *rozwinięte jest to, co zaznaczone* —
-czyli to, co faktycznie się wydarzy po kliknięciu. Zrobione, pominięte i ręcznie odznaczone
-kurczą się do samego tytułu (przy 12 pozycjach, z których 9 jest „ZROBIONE", to różnica
-między listą do czytania a ścianą tekstu). Wyjątek: **pozycji w stanie `error` nie zwijamy
-nigdy** — niewidoczny błąd jest gorszy niż bałagan. Ręczne kliknięcie w nagłówek nadpisuje
-regułę do czasu przebudowy planu; zmiana pola wyboru wraca do automatu.
+**Zwijanie pozycji w oknie.** Reguła jest jedna i **nie zależy od stanu**: każda pozycja
+startuje zwinięta, do samego tytułu ze znacznikiem stanu. Wcześniej rozwijało się to, co
+zaznaczone — brzmiało sensownie, ale przy świeżej instancji oznaczało, że *wszystko* jest
+rozwinięte, czyli ścianę tekstu dokładnie wtedy, gdy lista jest najdłuższa. Kto chce
+szczegółów, klika w nagłówek albo w **Rozwiń wszystko**; ręczne rozwinięcia żyją do
+przebudowy planu. Zaznaczenie pola wyboru **nie rusza** zwijania — zwinięcie pozycji,
+której ktoś właśnie się przygląda, wyrywałoby ją sprzed oczu.
+
+**Stan stoi przed tytułem**, w kolumnie o stałej szerokości. Przy zwiniętej liście to
+jedyna rzecz odróżniająca wiersze od siebie, więc musi zaczynać się w tym samym miejscu
+w każdym z nich — znacznik dopisany za tytułem lądowałby za każdym razem gdzie indziej.
 
 ---
 

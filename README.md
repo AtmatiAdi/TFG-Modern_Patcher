@@ -15,10 +15,9 @@ Pojedynczy przenośny `.exe` — nie wymaga Javy ani niczego doinstalowanego.
    gry, instancji lub serwera. Aplikacja rozpozna, co to jest.
 3. Wybierz profil maszyny.
 4. **Plan pokazuje się sam** i odświeża po każdej zmianie: każda pozycja osobno, ze stanem
-   *zrobione / do zmiany / brak celu*. Zaznaczone jest to, co faktycznie jest do zrobienia.
-   Pozycje **zrobione i odznaczone zwijają się do samego tytułu**, żeby zostało na wierzchu
-   to, co się wydarzy — klik w nagłówek rozwija pojedynczą, przycisk **Rozwiń wszystko**
-   pokazuje całość.
+   *zrobione / do zmiany / brak celu* wypisanym **na początku wiersza**. Zaznaczone jest to,
+   co faktycznie jest do zrobienia. Wszystkie pozycje są **zwinięte do samego tytułu** —
+   klik w nagłówek rozwija pojedynczą, przycisk **Rozwiń wszystko** pokazuje całość.
 5. **Zastosuj zaznaczone.**
 
 | Profil | Dla kogo |
