@@ -23,10 +23,15 @@ function Head($msg) { Write-Host ""; Write-Host $msg -ForegroundColor Cyan }
 
 # Porownanie numerow po segmentach, a nie jako napisow: "0.10.0" jest wyzsze niz "0.9.0",
 # choc alfabetycznie wypada odwrotnie.
+#
+# Nazwy $segA/$segB, a nie $A/$B: w PowerShellu nazwy zmiennych nie rozrozniaja wielkosci
+# liter, wiec $A JEST parametrem $a. Tablica wpisana do parametru [string] wraca do niego
+# jako napis "3 1 0" i petla porownuje wtedy pojedyncze ZNAKI, nie segmenty - "3.1.1" i
+# "3.1.0" wygladaja identycznie na trzech pierwszych znakach.
 function VerGt([string]$a, [string]$b) {
-  $A = $a.Split('.'); $B = $b.Split('.')
+  $segA = $a.Split('.'); $segB = $b.Split('.')
   for ($i = 0; $i -lt 3; $i++) {
-    $x = [int]$A[$i]; $y = [int]$B[$i]
+    $x = [int]$segA[$i]; $y = [int]$segB[$i]
     if ($x -ne $y) { return $x -gt $y }
   }
   return $false
