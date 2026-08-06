@@ -1,6 +1,9 @@
-# Budowa TFG Patchera -> dist/TFG-Patcher-<wersja>.exe
+# Budowa TFG Patchera -> dist/TFG-Patcher-<wersja>.exe  +  .zip
 #
-# Wynik to POJEDYNCZY, przenosny .exe - nie wymaga Javy ani niczego doinstalowanego.
+# Wynik nie wymaga Javy ani niczego doinstalowanego. Sa DWIE postacie tego samego:
+#  - .exe - pojedynczy przenosny plik, wygodniejszy,
+#  - .zip - ta sama aplikacja rozpakowana. Konieczna, bo Windows 11 ze Smart App Control
+#           blokuje .exe (stub portable nie ma reputacji), a rozpakowana wersje puszcza.
 #
 # W przeciwienstwie do wersji 2.x nic nie jest sklejane z zywej instancji gry:
 #  - mody pobiera sam Patcher z wydan wymienionych w sources.json,
@@ -41,8 +44,10 @@ try {
     Write-Host "Pakuje (tylko katalog)..."
     npx electron-builder --win dir --publish never
   } else {
-    Write-Host "Pakuje do .exe..."
-    npx electron-builder --win portable --publish never
+    # Bez nazwy celu: bierze oba z package.json (portable + zip). ZIP jest potrzebny,
+    # bo Smart App Control blokuje pojedynczy .exe - patrz docs/PATCHER.md.
+    Write-Host "Pakuje do .exe i .zip..."
+    npx electron-builder --win --publish never
   }
   if ($LASTEXITCODE -ne 0) { throw "electron-builder zwrocil $LASTEXITCODE" }
 } finally {
@@ -50,5 +55,6 @@ try {
 }
 
 Write-Host ""
-Get-ChildItem (Join-Path $root 'dist') -Filter '*.exe' -ErrorAction SilentlyContinue |
+Get-ChildItem (Join-Path $root 'dist') -Include '*.exe', '*.zip' -Recurse -Depth 0 -ErrorAction SilentlyContinue |
+  Sort-Object Name |
   ForEach-Object { Write-Host ("Zbudowano: {0} ({1} MB)" -f $_.FullName, [math]::Round($_.Length/1MB,1)) }

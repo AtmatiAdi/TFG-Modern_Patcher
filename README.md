@@ -11,6 +11,11 @@ Pojedynczy przenośny `.exe` — nie wymaga Javy ani niczego doinstalowanego.
 ## Dla użytkownika
 
 1. Uruchom `TFG-Patcher-<wersja>.exe`.
+   **Jeśli Windows 11 pokaże „Smart App Control zablokował tę aplikację"** — pobierz
+   zamiast tego `TFG-Patcher-<wersja>.zip`, rozpakuj i uruchom `TFG-Patcher.exe` ze
+   środka. To ta sama aplikacja; blokowany jest wyłącznie format pojedynczego pliku.
+   Klikanie „Uruchom mimo to", uprawnienia administratora ani „Odblokuj" we
+   właściwościach **nie pomogą** — Smart App Control nie ma listy wyjątków.
 2. Wybierz instancję z listy (Prism Launcher wykrywany jest sam) albo wskaż katalog —
    gry, instancji lub serwera. Aplikacja rozpozna, co to jest.
 3. Wybierz profil maszyny.
@@ -54,9 +59,14 @@ node src/cli.js -i /sciezka/do/serwera --revert
 ## Budowa i wydanie
 
 ```powershell
-pwsh -File build.ps1        # zbuduj -> dist/TFG-Patcher-<wersja>.exe
+pwsh -File build.ps1        # zbuduj -> dist/TFG-Patcher-<wersja>.exe + .zip
 pwsh -File release.ps1      # pokaz ostatnie wydanie, zapytaj o numer, zbuduj i wydaj
 ```
+
+Każde wydanie niesie **dwa załączniki** — pojedynczy `.exe` i tę samą aplikację w `.zip`.
+ZIP nie jest wygodą, tylko koniecznością: Windows 11 ze Smart App Control blokuje `.exe`
+i **nie da się tego obejść po stronie użytkownika**. `release.ps1` przerywa wydanie, gdy
+brakuje któregokolwiek z tych plików.
 
 `release.ps1` prowadzi za rękę i **nic nie robi po cichu**:
 

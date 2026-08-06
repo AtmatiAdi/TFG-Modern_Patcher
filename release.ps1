@@ -113,11 +113,17 @@ if ($Version) {
 
 $tag = "v$Version"
 $exePath = Join-Path $root ("dist\TFG-Patcher-{0}.exe" -f $Version)
+# ZIP jest OBOWIAZKOWYM drugim zalacznikiem, nie dodatkiem dla wygody: Smart App Control
+# w Windows 11 blokuje pojedynczy .exe (stub portable nie ma reputacji i nie da sie go
+# odblokowac - SAC nie ma listy wyjatkow), a te sama aplikacje rozpakowana z ZIP-a
+# przepuszcza. Szczegoly i pomiary: docs/PATCHER.md.
+$zipPath = Join-Path $root ("dist\TFG-Patcher-{0}.zip" -f $Version)
 
 Head 'Plan wydania'
 Write-Host ("  wersja:  {0} -> {1}" -f $current, $Version)
 Write-Host ("  tag:     {0}" -f $tag)
-Write-Host ("  plik:    {0}" -f $exePath)
+Write-Host ("  pliki:   {0}" -f $exePath)
+Write-Host ("           {0}" -f $zipPath)
 
 # Proba konczy sie tutaj: nie ruszamy package.json, zeby nie zostawic repo w polowie
 # wydania. Sam build sprawdza sie osobno przez build.ps1.
@@ -126,7 +132,7 @@ if ($DryRun) {
   Write-Host "  package.json: $current -> $Version"
   Write-Host "  pwsh -File build.ps1"
   Write-Host "  git commit -am `"TFG Patcher $Version`" ; git push"
-  Write-Host "  gh release create $tag `"$exePath`" --title `"TFG Patcher $Version`" --generate-notes"
+  Write-Host "  gh release create $tag `"$exePath`" `"$zipPath`" --title `"TFG Patcher $Version`" --generate-notes"
   exit 0
 }
 
@@ -148,14 +154,20 @@ if ($current -ne $Version) {
 
 # --- 5. build ------------------------------------------------------------------
 if ($SkipBuild) {
-  if (-not (Test-Path $exePath)) { Fail "brak $exePath, a podano -SkipBuild" }
+  foreach ($f in @($exePath, $zipPath)) {
+    if (-not (Test-Path $f)) { Fail "brak $f, a podano -SkipBuild" }
+  }
   Write-Host "  build pominiety (-SkipBuild)"
 } else {
   Head 'Budowanie'
   & (Join-Path $root 'build.ps1')
   if ($LASTEXITCODE -ne 0) { Fail "build.ps1 zwrocil $LASTEXITCODE" }
 }
-if (-not (Test-Path $exePath)) { Fail "build nie zostawil pliku $exePath" }
+# Brak ZIP-a przerywa wydanie tak samo jak brak .exe: wydanie z samym .exe jest dla
+# czesci odbiorcow wydaniem, ktorego nie da sie uruchomic.
+foreach ($f in @($exePath, $zipPath)) {
+  if (-not (Test-Path $f)) { Fail "build nie zostawil pliku $f" }
+}
 $mb = [math]::Round((Get-Item $exePath).Length / 1MB, 1)
 
 # --- 6. publikacja -------------------------------------------------------------
@@ -168,7 +180,7 @@ if (& git status --porcelain) {
 & git push
 if ($LASTEXITCODE -ne 0) { Fail "git push zwrocil $LASTEXITCODE" }
 
-& gh release create $tag $exePath --title "TFG Patcher $Version" --generate-notes
+& gh release create $tag $exePath $zipPath --title "TFG Patcher $Version" --generate-notes
 if ($LASTEXITCODE -ne 0) { Fail "gh release create zwrocil $LASTEXITCODE" }
 
 Write-Host ""

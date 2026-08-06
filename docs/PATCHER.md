@@ -216,6 +216,26 @@ za wydanym `.exe`. Ręcznie: `npm run icon`.
   służą `TFG_UI_DUMP` (wymiary + elementy wychodzące poza viewport) i `TFG_UI_SHOT`
   (zrzut robiony od środka, przez `capturePage`).
 - **Niepodpisany exe** wywołuje SmartScreen przy pierwszym uruchomieniu u odbiorcy.
+- **Smart App Control (Windows 11) blokuje pojedynczy `.exe` i nie da się go odblokować.**
+  To nie SmartScreen: SAC **nie ma listy wyjątków**, nie patrzy na Mark of the Web
+  i nie obchodzą go uprawnienia administratora. Sprawdzone na `VerifiedAndReputablePolicyState = 1`:
+
+  | Co uruchamiane | Wynik |
+  |---|---|
+  | `dist/TFG-Patcher-<wersja>.exe` (stub portable) | **zablokowany**, także zbudowany lokalnie, bez MOTW |
+  | `dist/win-unpacked/TFG-Patcher.exe` | działa, również z `ZoneId=3` |
+  | rozpakowany `.zip` | działa |
+  | `node_modules/electron/dist/electron.exe` | działa, **mimo że jest niepodpisany** |
+
+  Ostatni wiersz mówi, o co naprawdę chodzi: kryterium jest **reputacja, nie podpis**.
+  Electron jest widziany przez Microsoft w milionach instalacji, a świeżo zbudowany stub
+  NSIS jest nieznany — w dodatku samorozpakowujące się archiwum to kształt typowy dla
+  złośliwego oprogramowania. Zawartość paczki przechodzi, bo to praktycznie binarka
+  Electrona. **Dlatego każde wydanie musi nieść ZIP**, a `release.ps1` przerywa pracę,
+  gdy go brakuje. Trwałe rozwiązanie to podpisanie pliku certyfikatem od CA z programu
+  Microsoftu — wtedy `.exe` też przechodzi, i przy okazji milknie SmartScreen. Uwaga przy
+  wdrażaniu: `signAndEditExecutable: false` wyłącza również podpisywanie przez
+  electron-builder, więc podpis trzeba nałożyć **po budowie**, osobnym `signtool`.
 - Wersję z `package.json` widać w nazwie pliku i w oknie — **podbijaj ją**, gdy zmienia się
   zawartość, inaczej odbiorca nie odróżni buildów.
 

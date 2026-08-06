@@ -27,8 +27,11 @@
       { "from": "build/icon.ico", "to": "icon.ico" }
     ],
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }],
-      "artifactName": "TFG-Patcher-${version}.exe",
+      "target": [
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
+      ],
+      "artifactName": "TFG-Patcher-${version}.${ext}",
       "icon": "build/icon.ico",
       "signAndEditExecutable": false
     },
