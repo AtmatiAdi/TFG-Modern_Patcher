@@ -69,6 +69,13 @@ której ktoś właśnie się przygląda, wyrywałoby ją sprzed oczu.
 jedyna rzecz odróżniająca wiersze od siebie, więc musi zaczynać się w tym samym miejscu
 w każdym z nich — znacznik dopisany za tytułem lądowałby za każdym razem gdzie indziej.
 
+**Licznik „do zmiany" liczy zaznaczone**, a nie wszystkie pozycje różne od celu. Nagłówek
+ma mówić, **co się stanie po kliknięciu**: liczba pozycji rozjeżdżających się z instancją
+kłóciła się i z listą, i z przyciskiem, bo preset odznacza część pozycji sam
+(`selected: false`), a użytkownik odznacza kolejne. Gdy zaznaczone nie jest wszystko, widać
+oba człony — **„3 z 11 do zmiany"** — żeby nie zniknął rozmiar roboty, która zostaje.
+Pozostałe liczniki są czystym stanem instancji i selekcji nie znają.
+
 ---
 
 ## Grupy
@@ -138,9 +145,11 @@ Tutaj przychodzisz tylko wtedy, gdy istniejące operacje nie wystarczają:
 1. Nowy rodzaj operacji — dopisz go w `engine/changes.js` (musi mieć `describe`, `check`
    i `apply` z zapisem do dziennika), podepnij w `engine/compile.js` i dodaj do listy
    `OPS` w `engine/preset.js`.
-2. Opisz go w `PRESET-FORMAT.md` **po obu stronach** i podbij `formatVersion` — to umowa,
-   nie szczegół implementacji. Starszy Patcher musi odrzucić manifest, którego nie umie
-   wykonać, zamiast wykonać go połowicznie.
+2. Opisz go w `PRESET-FORMAT.md` — plik leży **po stronie configów**
+   (`TFG-Modern_atmatiadi_configs/docs/`), jest jeden i nie ma tu kopii — i podbij
+   `formatVersion`. To umowa, nie szczegół implementacji: starszy Patcher musi odrzucić
+   manifest, którego nie umie wykonać, zamiast wykonać go połowicznie. Walidator po tamtej
+   stronie (`build/validate.js`) ma sprawdzać to samo, co `engine/preset.js` tutaj.
 3. Sprawdź na atrapie instancji: plan → apply → ponowny plan (wszystko „ZROBIONE") →
    revert (stan wraca).
 

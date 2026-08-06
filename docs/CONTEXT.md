@@ -129,8 +129,9 @@ Zmienne środowiskowe przydatne przy pracy:
   żadnej nazwy moda ani żadnego zasobu. `patches.js` buduje plan z presetu, `runner.js`
   bierze profile z presetu, `assets/` już nie ma. Zostały dwa osobne projekty:
   `TFG-Modern_atmatiadi_configs` (preset) i `TFG-Modern_atmatiadi_mods` (jary).
-- **Umowa z repozytorium configów: `PRESET-FORMAT.md`** — kopia leży w tamtym repo,
-  w `docs/`. Zmiana formatu to zmiana obu stron naraz i podbicie `formatVersion`.
+- **Umowa z repozytorium configów: `PRESET-FORMAT.md`** — plik jest **jeden** i leży
+  w tamtym repo, w `docs/`; tutaj go nie kopiujemy, bo dwie kopie i tak by się rozjechały.
+  Zmiana formatu to opis tam, implementacja tutaj i podbicie `formatVersion`.
 - **Bez presetu plan pokazuje same mody.** To poprawny stan, nie awaria — repozytorium
   bez wydania z presetem po prostu nic nie wnosi.
 - Model „wielu współpracowników, każdy z własnym repo" obsługuje `sources.json` plus plik

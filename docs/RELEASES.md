@@ -93,8 +93,9 @@ nie zostanie za moda wzięty — i nie jest z tego powodu zgłaszany w logu jako
 
 Instrukcja i skrypt pakujący są po tamtej stronie:
 `TFG-Modern_atmatiadi_configs/docs/RELEASING.md` (`pwsh -File build/pack.ps1 -Release`).
-Format manifestu opisuje `docs/PRESET-FORMAT.md` — **umowa obu repozytoriów**, więc jego
-zmiana to zmiana po obu stronach i podbicie `formatVersion`.
+Format manifestu opisuje `TFG-Modern_atmatiadi_configs/docs/PRESET-FORMAT.md` — **umowa obu
+repozytoriów**, ale plik jest jeden i leży tam. Zmiana formatu to opis tam, implementacja
+tutaj i podbicie `formatVersion`.
 
 Manifest, którego Patcher nie rozumie, jest **odrzucany w całości** i mówi o tym w logu.
 Lepiej brak pozycji niż połowa wykonanej optymalizacji.

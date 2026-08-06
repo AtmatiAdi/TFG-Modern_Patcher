@@ -18,6 +18,8 @@ Pojedynczy przenośny `.exe` — nie wymaga Javy ani niczego doinstalowanego.
    *zrobione / do zmiany / brak celu* wypisanym **na początku wiersza**. Zaznaczone jest to,
    co faktycznie jest do zrobienia. Wszystkie pozycje są **zwinięte do samego tytułu** —
    klik w nagłówek rozwija pojedynczą, przycisk **Rozwiń wszystko** pokazuje całość.
+   Licznik u góry mówi, **ile zostanie zmienione po kliknięciu**, więc idzie za polami
+   wyboru: odznaczenie czegoś zmienia go od razu (*„3 z 11 do zmiany"*).
 5. **Zastosuj zaznaczone.**
 
 | Profil | Dla kogo |

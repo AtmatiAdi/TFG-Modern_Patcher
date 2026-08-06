@@ -299,15 +299,25 @@ function updateExpandBtn() {
 
 function updateCounts() {
   const by = s => state.items.filter(i => i.state === s).length;
+
+  // "do zmiany" liczy ZAZNACZONE, bo naglowek ma mowic, co sie stanie po kliknieciu.
+  // Sama liczba pozycji roznych od celu klocila sie z lista i z przyciskiem: preset
+  // odznacza czesc pozycji sam (selected: false), a uzytkownik odznacza kolejne, i nic
+  // z tego nie bylo widac. Gdy zaznaczone nie jest wszystko, pokazujemy oba czlony
+  // ("3 z 11") - inaczej zniknelby rozmiar roboty, ktora zostaje do zrobienia.
+  const todo = state.items.filter(i => i.state === 'todo');
+  const todoOn = todo.filter(i => state.checked.has(i.id)).length;
+
   const chips = [
-    ['todo', by('todo'), 'do zmiany'],
-    ['ok', by('ok'), 'zrobione'],
-    ['missing', by('missing'), 'brak celu'],
-    ['skipped', by('skipped'), 'pominiete'],
-    ['error', by('error'), 'blad'],
+    ['todo', todo.length, todoOn === todo.length ? `${todo.length}` : `${todoOn} z ${todo.length}`, 'do zmiany'],
+    ['ok', by('ok'), null, 'zrobione'],
+    ['missing', by('missing'), null, 'brak celu'],
+    ['skipped', by('skipped'), null, 'pominiete'],
+    ['error', by('error'), null, 'blad'],
   ].filter(([, n]) => n > 0);
   // Licznika zwinietych juz nie ma: skoro zwiniete jest wszystko, ta liczba nic nie mowi.
-  els.counts.innerHTML = chips.map(([cls, n, label]) => `<span class="pill ${cls}">${n} ${label}</span>`).join('');
+  els.counts.innerHTML = chips.map(([cls, n, text, label]) =>
+    `<span class="pill ${cls}">${text || n} ${label}</span>`).join('');
   els.apply.disabled = state.busy || state.checked.size === 0;
   els.apply.textContent = state.checked.size
     ? `Zastosuj zaznaczone (${state.checked.size})` : 'Zastosuj zaznaczone';

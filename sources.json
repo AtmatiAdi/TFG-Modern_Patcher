@@ -13,7 +13,7 @@
     "",
     "  CONFIGI - najnowsze wydanie z zalacznikiem 'preset-*.json'. Manifest opisuje",
     "            optymalizacje i pliki do wgrania - configi, kubejs, shaderpacki,",
-    "            narzedzia (docs/PRESET-FORMAT.md).",
+    "            narzedzia (opis formatu: docs/PRESET-FORMAT.md w repo configow).",
     "",
     "Pola opcjonalne wpisu: label (nazwa w logu), side (client/server/both dla modow),",
     "prerelease (true = brac tez przedwydania), only/except (lista nazw modow).",
