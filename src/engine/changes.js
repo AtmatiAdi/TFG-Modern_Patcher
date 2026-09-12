@@ -16,12 +16,14 @@ const missing = text => ({ state: 'missing', text });
 const error   = text => ({ state: 'error', text });
 
 const val = (v, opts) => (typeof v === 'function' ? v(opts) : v);
+/** Wartosc do pokazania: bez cudzyslowow, a pusta - widoczna (wycofanie czysci klucze). */
+const show = v => { const t = tc.norm(v); return t === '' ? '(puste)' : t; };
 
 // ------------------------------------------------------------------ klucz w pliku
 
 function setKey({ target, label, section = null, key, style, value, addIfMissing = true }) {
   return {
-    describe: opts => `${label} -> ${section ? `[${section}] ` : ''}${key} = ${tc.norm(val(value, opts))}`,
+    describe: opts => `${label} -> ${section ? `[${section}] ` : ''}${key} = ${show(val(value, opts))}`,
     check(inst, opts) {
       const file = target(inst);
       if (!fs.existsSync(file)) return missing('brak pliku ' + label);
@@ -29,11 +31,11 @@ function setKey({ target, label, section = null, key, style, value, addIfMissing
         const want = val(value, opts);
         const cur = tc.get(file, section, key, style);
         if (cur === null) {
-          return addIfMissing ? todo(`${key}: brak wpisu -> dopisze ${tc.norm(want)}`)
+          return addIfMissing ? todo(`${key}: brak wpisu -> dopisze ${show(want)}`)
                               : missing(`${key}: brak wpisu w ${label}`);
         }
-        if (tc.norm(cur) === tc.norm(want)) return ok(`${key} = ${tc.norm(cur)}`);
-        return todo(`${key}: ${tc.norm(cur)} -> ${tc.norm(want)}`);
+        if (tc.norm(cur) === tc.norm(want)) return ok(`${key} = ${show(cur)}`);
+        return todo(`${key}: ${show(cur)} -> ${show(want)}`);
       } catch (e) {
         return error(`${label}: ${e.message}`);
       }
@@ -44,7 +46,7 @@ function setKey({ target, label, section = null, key, style, value, addIfMissing
       const before = tc.get(file, section, key, style);
       const want = val(value, opts);
       if (tc.set(file, section, key, style, want, addIfMissing)) {
-        log(`    ${label}: ${key} ${before === null ? '(dopisane)' : tc.norm(before) + ' ->'} ${tc.norm(want)}`);
+        log(`    ${label}: ${key} ${before === null ? '(dopisane)' : show(before) + ' ->'} ${show(want)}`);
       }
     },
   };
@@ -195,7 +197,90 @@ function installArchive({ resource, target, label, onlyIfMissing = false }) {
   };
 }
 
+// ------------------------------------------------------------ usuniecie sciezki
+
+/** Wszystkie pliki pod sciezka (plik -> on sam), do kopii i do dziennika. */
+function filesUnder(p) {
+  if (!fs.existsSync(p)) return [];
+  if (!fs.statSync(p).isDirectory()) return [p];
+  const out = [];
+  for (const name of fs.readdirSync(p)) out.push(...filesUnder(path.join(p, name)));
+  return out;
+}
+
+/**
+ * Usuniecie pliku albo katalogu - operacja "undo" dla installAsset. Kazdy plik idzie
+ * do kopii zapasowej osobno (wpis DELETE), wiec "Cofnij ostatnie" odtwarza calosc.
+ * Katalog gry i katalog instancji nie sa celem - zle napisany preset nie ma jak
+ * wyczyscic instancji.
+ */
+function removePath({ target, label }) {
+  const guard = (inst, p) => {
+    const full = path.resolve(p);
+    for (const root of [inst.root, inst.gameDir, inst.mods]) {
+      if (root && path.resolve(root) === full) throw new Error(`odmowa usuniecia katalogu glownego: ${label}`);
+    }
+  };
+  return {
+    describe: () => `usuniecie ${label}`,
+    check(inst) {
+      try {
+        const p = target(inst);
+        guard(inst, p);
+        if (!fs.existsSync(p)) return ok(`${label}: nie ma`);
+        const n = filesUnder(p).length;
+        return todo(`${label}: usunie${n > 1 ? ` (${n} plikow)` : ''}`);
+      } catch (e) {
+        return error(`${label}: ${e.message}`);
+      }
+    },
+    apply(inst, opts, journal, log) {
+      const p = target(inst);
+      guard(inst, p);
+      if (!fs.existsSync(p)) return;
+      const files = filesUnder(p);
+      for (const f of files) journal.deleteWithBackup(f);
+      // puste katalogi po plikach - od najglebszych
+      if (fs.statSync(p).isDirectory()) fs.rmSync(p, { recursive: true, force: true });
+      log(`    usunieto ${label} (${files.length} plikow, kopia w dzienniku)`);
+    },
+  };
+}
+
 // --------------------------------------------------------------- wylaczanie modow
+
+/**
+ * Odwrotnosc disableMods: .jar.disabled -> .jar. Bez skanu - wlaczenie moda niczego
+ * nie pozbawia klas.
+ */
+function enableMods({ prefixes }) {
+  const list = (inst, suffix) => {
+    if (!fs.existsSync(inst.mods)) return [];
+    return fs.readdirSync(inst.mods)
+      .filter(n => n.endsWith(suffix) && prefixes.some(p => n.startsWith(p)))
+      .sort();
+  };
+  return {
+    describe: () => `wlaczenie modow (${prefixes.join(', ')}) przez .jar.disabled -> .jar`,
+    check(inst) {
+      if (!fs.existsSync(inst.mods)) return missing('brak katalogu mods/');
+      const off = list(inst, '.jar.disabled');
+      if (off.length) return todo('wlaczy: ' + off.map(n => n.replace(/\.disabled$/, '')).join(', '));
+      const on = list(inst, '.jar');
+      if (on.length) return ok(`wlaczone (${on.length}): ` + on.map(n => n.replace(/\.jar$/, '')).join(', '));
+      return missing(`zadnego z modow (${prefixes.join(', ')}) nie ma w tej instancji`);
+    },
+    apply(inst, opts, journal, log) {
+      for (const name of list(inst, '.jar.disabled')) {
+        const off = path.join(inst.mods, name);
+        const jar = off.replace(/\.disabled$/, '');
+        fs.renameSync(off, jar);
+        journal.recordRename(off, jar);
+        log('    wlaczono ' + path.basename(jar));
+      }
+    },
+  };
+}
 
 /**
  * Rename .jar -> .jar.disabled ze skanem bajtkodu pozostalych modow.
@@ -264,4 +349,4 @@ function disableMods({ prefixes, scan }) {
   };
 }
 
-module.exports = { setKey, setJson, installFile, installArchive, disableMods, fileResource };
+module.exports = { setKey, setJson, installFile, installArchive, removePath, disableMods, enableMods, fileResource };

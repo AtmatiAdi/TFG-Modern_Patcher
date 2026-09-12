@@ -7,7 +7,7 @@
 
 const path = require('path');
 const { STYLES } = require('./textconfig');
-const { setKey, setJson, installFile, installArchive, disableMods, fileResource } = require('./changes');
+const { setKey, setJson, installFile, installArchive, removePath, disableMods, enableMods, fileResource } = require('./changes');
 const preset = require('./preset');
 
 /** Katalog narzedzi w instancji - tam laduje wszystko z grupy "tools". */
@@ -78,6 +78,12 @@ function makeVars(manifest, profile, inst, opts) {
     vars.instanceDir = inst.root;
     vars.gameDir = inst.gameDir;
     vars.toolsDir = toolsDir(inst);
+  } else {
+    // --list bez instancji: pozycja z {toolsDir} ma sie dac OPISAC, a nie wypasc
+    // z listy jako "nieznana zmienna". Sciezek i tak nikt tu nie rozwiazuje.
+    vars.instanceDir = '@instance';
+    vars.gameDir = '.';
+    vars.toolsDir = '@tools';
   }
   vars.profile = (profile && profile.id) || 'standard';
   return vars;
@@ -109,6 +115,18 @@ function defaultSelected(item, profileId) {
   if (Object.prototype.hasOwnProperty.call(s, profileId)) return Boolean(s[profileId]);
   if (Object.prototype.hasOwnProperty.call(s, '*')) return Boolean(s['*']);
   return true;
+}
+
+/**
+ * Tryb pozycji w profilu: "on" (zastosuj), "off" (wycofaj), "skip" (nie ruszaj).
+ * Profile musza sie WZAJEMNIE wycofywac, nie tylko dokladac: przelaczenie
+ * Standard -> High ma zdjac RAM Keepera, a nie zostawic go "bo odznaczony".
+ * Dlatego pozycja odznaczona w profilu, ktora ma "undo", jest domyslnie do wycofania.
+ * Preset bez "undo" (cudzy, starszy) zachowuje sie jak dotad: odznaczona = nie ruszaj.
+ */
+function defaultMode(item, profileId) {
+  if (defaultSelected(item, profileId)) return 'on';
+  return Array.isArray(item.undo) && item.undo.length ? 'off' : 'skip';
 }
 
 function change(op, vars, inst, source) {
@@ -159,8 +177,15 @@ function change(op, vars, inst, source) {
       onlyIfMissing: Boolean(op.onlyIfMissing),
     });
   }
+  if (op.op === 'removePath') {
+    const targetRel = subst(op.target, vars);
+    return removePath({ target: i => resolveTarget(i, targetRel), label: pathLabel(targetRel) });
+  }
   if (op.op === 'disableMods') {
     return disableMods({ prefixes: op.prefixes, scan: op.scan });
+  }
+  if (op.op === 'enableMods') {
+    return enableMods({ prefixes: op.prefixes });
   }
   throw new Error('nieznana operacja ' + op.op);
 }
@@ -198,14 +223,18 @@ function compile(manifest, opts, inst, source = null) {
         doc: item.doc || manifest.docs || manifest.id,
         why: item.why ? subst(item.why, vars) : '',
         selected: defaultSelected(item, (profile && profile.id) || opts.profile),
+        mode: defaultMode(item, (profile && profile.id) || opts.profile),
         changes: item.changes.map(op => change(op, vars, inst, source)),
+        // stan "wylaczony" pozycji - null, gdy preset go nie opisuje
+        undo: Array.isArray(item.undo) && item.undo.length
+          ? item.undo.map(op => change(op, vars, inst, source)) : null,
       });
     } catch (e) {
       // Jedna zla pozycja nie moze wywalic calego planu - pokazujemy ja jako blad.
       out.push({
         id: item.id, group: item.group || 'optimizations', side: item.side || 'both',
         title: item.title || item.id, doc: item.doc || '', why: 'Pozycja odrzucona: ' + e.message,
-        selected: false, changes: [], broken: e.message,
+        selected: false, mode: 'skip', changes: [], undo: null, broken: e.message,
       });
     }
   }

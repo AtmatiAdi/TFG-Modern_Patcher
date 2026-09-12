@@ -30,7 +30,9 @@ const state = {
   groups: [],
   profile: 'standard',
   items: [],
-  checked: new Set(),
+  // Tryb kazdej pozycji: 'on' (zastosuj), 'off' (wycofaj wg "undo" z presetu),
+  // 'skip' (nie ruszaj). Nieobecna w mapie = skip.
+  mode: new Map(),
   busy: false,
   planToken: 0,
   // Zwijanie: KAZDA pozycja startuje zwinieta, niezaleznie od stanu. manualExpand
@@ -41,8 +43,15 @@ const state = {
 };
 
 const STATE_LABEL = { ok: 'zrobione', todo: 'do zmiany', missing: 'brak celu', error: 'blad', skipped: 'pominiete' };
+// Ta sama pozycja ogladana od strony "wycofaj": ok = juz wycofane, todo = do wycofania.
+const OFF_LABEL = { ...STATE_LABEL, ok: 'wycofane', todo: 'do wycofania' };
 const SIDE_LABEL = { client: 'klient', server: 'serwer', both: 'klient+serwer' };
 const MARK = { ok: '✓', todo: '→', missing: '–', error: '!' };
+const MODE_TITLE = {
+  on: 'zastosuj (klik: wycofaj / nie ruszaj)',
+  off: 'wycofaj wg presetu (klik: nie ruszaj)',
+  skip: 'nie ruszaj (klik: zastosuj)',
+};
 
 function log(msg) {
   els.log.textContent += msg + '\n';
@@ -70,7 +79,8 @@ function log(msg) {
     ? 'Optymalizacje i pliki gry z presetow pobranych z repozytoriow.'
     : 'Brak presetu - zadne repozytorium nie ma wydania z preset-*.json. '
       + 'Plan pokazuje same mody.');
-  log('Plan odswieza sie sam. Zaznacz pozycje i kliknij "Zastosuj zaznaczone".');
+  log('Plan odswieza sie sam. Kwadrat przy pozycji: ✓ zastosuj, ✕ wycofaj (gdy preset'
+    + ' umie), pusty = nie ruszaj. Potem "Zastosuj zaznaczone".');
   refreshPlan();
   doRefreshMods(true);
 })();
@@ -201,11 +211,15 @@ async function refreshPlan() {
   els.warnings.innerHTML = res.warnings.map(w => `<div class="warn-item">${escapeHtml(w)}</div>`).join('');
 
   state.items = res.items;
-  // Domyslnie zaznaczone jest to, co faktycznie jest do zrobienia I czego preset nie
-  // odznaczyl w tym profilu (np. narzedzie RAM jest odznaczone w profilu "high").
-  state.checked = new Set(res.items
-    .filter(i => i.state === 'todo' && i.selected !== false)
-    .map(i => i.id));
+  // Tryb domyslny bierze sie z presetu i profilu: "on" dla pozycji zaznaczonych,
+  // "off" dla odznaczonych, ktore preset umie wycofac (np. RAM Keeper w profilu
+  // "high" - Standard go zaklada, High ma go zdjac, nie zostawic). Pozycja, ktora
+  // w swoim trybie nie ma nic do roboty, startuje jako "nie ruszaj".
+  state.mode = new Map();
+  for (const i of res.items) {
+    if (i.mode === 'on' && i.state === 'todo') state.mode.set(i.id, 'on');
+    else if (i.mode === 'off' && i.undoState === 'todo') state.mode.set(i.id, 'off');
+  }
   // nowy plan = inny zestaw pozycji, wiec reczne rozwiniecia przestaja mieć sens
   state.manualExpand.clear();
   renderPlan();
@@ -248,31 +262,59 @@ function isExpanded(item) {
   return state.expandAll;
 }
 
-function renderItem(item) {
-  const el = document.createElement('div');
-  el.className = 'item ' + item.state + (isExpanded(item) ? '' : ' collapsed');
+function modeOf(item) { return state.mode.get(item.id) || 'skip'; }
 
-  const box = document.createElement('input');
-  box.type = 'checkbox';
-  box.checked = state.checked.has(item.id);
+/** Kolejny tryb po kliknieciu: on -> off (gdy preset umie wycofac) -> skip -> on. */
+function nextMode(item) {
+  const m = modeOf(item);
+  if (m === 'on') return item.canUndo ? 'off' : 'skip';
+  if (m === 'off') return 'skip';
+  return 'on';
+}
+
+/** Stan i linie pozycji OGLADANEJ w danym trybie: "wycofaj" pokazuje sprawdzenie "undo". */
+function view(item) {
+  const off = modeOf(item) === 'off';
+  return {
+    off,
+    state: off ? item.undoState : item.state,
+    statuses: off ? item.undoStatuses : item.statuses,
+    labels: off ? OFF_LABEL : STATE_LABEL,
+  };
+}
+
+function renderItem(item, replace = null) {
+  const v = view(item);
+  const el = document.createElement('div');
+  el.className = 'item ' + v.state + (v.off ? ' off' : '') + (isExpanded(item) ? '' : ' collapsed');
+  el.dataset.id = item.id;
+
+  // Trojstan zamiast checkboxa: zastosuj / wycofaj / nie ruszaj. Jeden przycisk w tej
+  // samej kolumnie, zeby tytuly nie skakaly; kolejne klikniecia przelaczaja tryb.
+  const box = document.createElement('button');
+  box.type = 'button';
+  box.className = 'tri ' + modeOf(item);
+  box.title = MODE_TITLE[modeOf(item)];
   // 'brak celu' tez da sie zaznaczyc - cel moze powstac przy wczesniejszej latce
   box.disabled = item.state === 'skipped' || item.state === 'error';
-  // Zaznaczenie nie rusza zwijania: zwiniecie pozycji, ktora ktos wlasnie rozwinal,
-  // zeby jej sie przyjrzec przed kliknieciem, bylo by wyrwaniem jej sprzed oczu.
-  box.addEventListener('change', () => {
-    box.checked ? state.checked.add(item.id) : state.checked.delete(item.id);
+  // Zmiana trybu nie rusza zwijania: zwiniecie pozycji, ktora ktos wlasnie rozwinal,
+  // zeby jej sie przyjrzec przed kliknieciem, byloby wyrwaniem jej sprzed oczu.
+  box.addEventListener('click', () => {
+    const m = nextMode(item);
+    m === 'skip' ? state.mode.delete(item.id) : state.mode.set(item.id, m);
+    renderItem(item, el);
     updateCounts();
   });
 
   const body = document.createElement('div');
   const lines = item.skipReason
     ? `<div class="line missing"><span class="m">–</span><span>${escapeHtml(item.skipReason)}</span></div>`
-    : item.statuses.map(s =>
+    : v.statuses.map(s =>
         `<div class="line ${s.state}"><span class="m">${MARK[s.state] || ''}</span><span>${escapeHtml(s.text)}</span></div>`).join('');
 
   body.innerHTML =
     `<div class="head">
-       <span class="pill state ${item.state}">${STATE_LABEL[item.state]}</span>
+       <span class="pill state ${v.state}${v.off ? ' off' : ''}">${v.labels[v.state]}</span>
        <span class="title">${escapeHtml(item.title)}</span>
        <span class="pill side">${SIDE_LABEL[item.side]}</span>
        <button class="toggle" type="button" title="Rozwin / zwin">
@@ -283,14 +325,14 @@ function renderItem(item) {
      <div class="lines">${lines}</div>
      <div class="doc">${escapeHtml(item.doc)}</div>`;
 
-  // Caly naglowek jest klikalny; checkbox lezy poza nim, wiec nic sie nie gryzie.
+  // Caly naglowek jest klikalny; trojstan lezy poza nim, wiec nic sie nie gryzie.
   body.querySelector('.head').addEventListener('click', () => {
     state.manualExpand.set(item.id, !isExpanded(item));
     el.classList.toggle('collapsed', !isExpanded(item));
   });
 
   el.append(box, body);
-  els.plan.appendChild(el);
+  replace ? replace.replaceWith(el) : els.plan.appendChild(el);
 }
 
 function updateExpandBtn() {
@@ -305,11 +347,15 @@ function updateCounts() {
   // odznacza czesc pozycji sam (selected: false), a uzytkownik odznacza kolejne, i nic
   // z tego nie bylo widac. Gdy zaznaczone nie jest wszystko, pokazujemy oba czlony
   // ("3 z 11") - inaczej zniknelby rozmiar roboty, ktora zostaje do zrobienia.
-  const todo = state.items.filter(i => i.state === 'todo');
-  const todoOn = todo.filter(i => state.checked.has(i.id)).length;
+  // Pozycja liczy sie w tym trybie, w ktorym jest ogladana: "wycofaj" patrzy na
+  // stan "undo", pozostale na stan "changes".
+  const todo = state.items.filter(i => view(i).state === 'todo');
+  const todoOn = todo.filter(i => modeOf(i) !== 'skip').length;
+  const off = state.items.filter(i => modeOf(i) === 'off').length;
 
   const chips = [
     ['todo', todo.length, todoOn === todo.length ? `${todo.length}` : `${todoOn} z ${todo.length}`, 'do zmiany'],
+    ['todo off', off, null, 'do wycofania'],
     ['ok', by('ok'), null, 'zrobione'],
     ['missing', by('missing'), null, 'brak celu'],
     ['skipped', by('skipped'), null, 'pominiete'],
@@ -318,9 +364,9 @@ function updateCounts() {
   // Licznika zwinietych juz nie ma: skoro zwiniete jest wszystko, ta liczba nic nie mowi.
   els.counts.innerHTML = chips.map(([cls, n, text, label]) =>
     `<span class="pill ${cls}">${text || n} ${label}</span>`).join('');
-  els.apply.disabled = state.busy || state.checked.size === 0;
-  els.apply.textContent = state.checked.size
-    ? `Zastosuj zaznaczone (${state.checked.size})` : 'Zastosuj zaznaczone';
+  els.apply.disabled = state.busy || state.mode.size === 0;
+  els.apply.textContent = state.mode.size
+    ? `Zastosuj zaznaczone (${state.mode.size})` : 'Zastosuj zaznaczone';
 }
 
 // ------------------------------------------------------------------- akcje
@@ -328,13 +374,14 @@ function updateCounts() {
 function setBusy(on) {
   state.busy = on;
   document.body.classList.toggle('busy', on);
-  els.apply.disabled = on || state.checked.size === 0;
+  els.apply.disabled = on || state.mode.size === 0;
   els.revert.disabled = on;
 }
 
 async function doApply() {
   const dir = els.path.value.trim();
-  const ids = [...state.checked];
+  const ids = { on: [], off: [] };
+  for (const [id, m] of state.mode) ids[m].push(id);
   setBusy(true);
   log('');
   log('Stosuje zmiany...');

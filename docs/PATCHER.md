@@ -12,6 +12,12 @@ to już nie tutaj, tylko w repozytorium configów (`docs/OPTIMIZATIONS-SPEC.md`,
 1. **Zmiana chirurgiczna, nie podmiana pliku.** Nakładamy się na cudze instancje, więc
    ruszamy pojedyncze klucze, zachowując komentarze, kolejność wpisów, wcięcia i znaki
    końca linii. Stąd własny `textconfig.js` zamiast bibliotek do TOML/INI/properties.
+   Wyjątek od „tekst jak w presecie": styl `ini` to `instance.cfg` Prisma, czytany przez
+   `QSettings::IniFormat`, w którym backslash otwiera sekwencję ucieczki. Preset podaje
+   wartość logiczną (`C:\Users\...\ram-keeper.cmd`), a `textconfig.js` zapisuje ją jako
+   `"C:\\Users\\...\\ram-keeper.cmd"` i tak samo odkodowuje przy porównaniu — inaczej Prism
+   przy pierwszym zapisie pliku zamieniał ścieżkę w `C:sers…<TAB>ools…` i `PreLaunchCommand`
+   nie startował.
 2. **Idempotencja.** Każda operacja umie powiedzieć, czy jest już zrobiona. Dwa
    uruchomienia z rzędu = jeden efekt, a plan czyta się jak diff.
 3. **Odwracalność.** Kopie plików lądują w `.tfg-patcher/backup-<data>/`, dziennik zapisuje
@@ -56,6 +62,24 @@ pliku configu) · `error` · `skipped` (nie dotyczy tej strony: klient/serwer).
 `runner.apply()` sprawdza stan każdej operacji **ponownie tuż przed wykonaniem**. Bez tego
 pozycja zależna od poprzedniej wyglądałaby na „brak celu": shaderpack dopiero tworzy plik
 ustawień, który zmienia pozycja `shaders-light`.
+
+**Pozycja ma dwie strony: `changes` i `undo`.** Profile muszą się **wzajemnie wycofywać**,
+nie tylko dokładać — wyszło to na RAM Keeperze: ktoś przypadkiem zastosował Standard,
+przełączył na High i nie miał jak go zdjąć, bo High tę pozycję jedynie *nie zaznaczał*.
+Dlatego preset może opisać stan wyłączony (`undo`, ten sam słownik operacji), a plan
+liczy dla pozycji **oba** stany (`state`/`statuses` i `undoState`/`undoStatuses`) i
+pokazuje ten, który wybrano. Tryb pozycji (`compile.defaultMode`): `on` gdy zaznaczona,
+`off` gdy odznaczona **i** ma `undo`, `skip` gdy odznaczona bez `undo` — czyli cudzy
+preset bez `undo` zachowuje się dokładnie jak dawniej. `runner.apply()` przyjmuje
+`{on:[id], off:[id]}`; `off` wykonuje `undo` pozycji przez ten sam dziennik, więc „Cofnij
+ostatnie" odwraca również wycofanie. Nowe operacje pod `undo`: `removePath`
+(z kopią każdego pliku) i `enableMods`.
+
+W oknie pole wyboru jest **trójstanem** (`.tri`): ✓ zastosuj → ✕ wycofaj (tylko gdy
+`canUndo`) → puste. Widok pozycji idzie za trybem — w trybie „wycofaj" pigułka mówi
+„do wycofania"/„wycofane" w bursztynie, a linie pokazują sprawdzenie `undo`. W CLI to
+samo: `--off id` wymusza wycofanie, a pozycje odznaczone w profilu z `undo` wycofują się
+domyślnie (`[ WYCOFAC ]` / `[ WYCOFANE]`).
 
 **Zwijanie pozycji w oknie.** Reguła jest jedna i **nie zależy od stanu**: każda pozycja
 startuje zwinięta, do samego tytułu ze znacznikiem stanu. Wcześniej rozwijało się to, co
@@ -237,7 +261,10 @@ za wydanym `.exe`. Ręcznie: `npm run icon`.
   kończy się natychmiast. To artefakt środowiska, nie błąd aplikacji.
 - **Zrzut ekranu okna z zewnątrz** kadruje je przy skalowaniu DPI. Do diagnostyki układu
   służą `TFG_UI_DUMP` (wymiary + elementy wychodzące poza viewport) i `TFG_UI_SHOT`
-  (zrzut robiony od środka, przez `capturePage`).
+  (zrzut robiony od środka, przez `capturePage`); `TFG_UI_PROFILE=<id>` przełącza
+  profil przed zrzutem, `TFG_UI_SCROLL=<id pozycji>` rozwija plan i przewija do pozycji.
+  Z `TFG_OFFLINE=1` okno nie sprawdza źródeł — z `TFG_CACHE_DIR` wskazującym kopię cache
+  z podmienionym `preset-*.json` da się obejrzeć preset przed wydaniem.
 - **Niepodpisany exe** wywołuje SmartScreen przy pierwszym uruchomieniu u odbiorcy.
 - **Smart App Control (Windows 11) blokuje pojedynczy `.exe` i nie da się go odblokować.**
   To nie SmartScreen: SAC **nie ma listy wyjątków**, nie patrzy na Mark of the Web

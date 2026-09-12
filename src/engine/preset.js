@@ -10,7 +10,7 @@
 const fs = require('fs');
 
 const FORMAT = 1;
-const OPS = ['setKey', 'setJson', 'installAsset', 'installRelease', 'disableMods'];
+const OPS = ['setKey', 'setJson', 'installAsset', 'installRelease', 'removePath', 'disableMods', 'enableMods'];
 const STYLES = ['toml', 'properties', 'options', 'ini'];
 const SIDES = ['client', 'server', 'both'];
 const BUILTIN_VARS = ['instanceDir', 'gameDir', 'toolsDir', 'profile'];
@@ -54,6 +54,50 @@ function badPath(value) {
     return `wyjscie poza katalog instancji jest zabronione: "${value}"`;
   }
   return null;
+}
+
+/** Lista operacji - ta sama dla "changes" i "undo". */
+function validateOps(list, where, err) {
+  for (const [j, c] of list.entries()) {
+    const cw = `${where}[${j}]`;
+    if (!c || !OPS.includes(c.op)) { err(cw, `nieznana operacja "${c && c.op}"`); continue; }
+
+    if (c.op === 'setKey' || c.op === 'setJson') {
+      if (!c.file) err(cw, 'brak "file"');
+      else { const bad = badPath(c.file); if (bad) err(cw, bad); }
+      if (!c.key) err(cw, 'brak "key"');
+      if (typeof c.value !== 'string') err(cw, '"value" musi byc napisem');
+      if (c.op === 'setKey' && !STYLES.includes(c.style)) err(cw, `zly "style" (${STYLES.join('/')})`);
+    }
+    if (c.op === 'installAsset' || c.op === 'installRelease') {
+      if (!c.asset) err(cw, 'brak "asset"');
+      if (!c.target) err(cw, 'brak "target"');
+      else { const bad = badPath(c.target); if (bad) err(cw, bad); }
+      if (c.op === 'installRelease' && !/^[\w.-]+\/[\w.-]+$/.test(c.repo || '')) {
+        err(cw, '"repo" ma miec postac wlasciciel/repozytorium');
+      }
+      if (c.unpack !== undefined && c.unpack !== null && c.unpack !== 'zip') {
+        err(cw, '"unpack" moze byc tylko "zip"');
+      }
+    }
+    if (c.op === 'removePath') {
+      if (!c.target) err(cw, 'brak "target"');
+      else {
+        const bad = badPath(c.target);
+        if (bad) err(cw, bad);
+        // Katalog glowny (instancji, gry, narzedzi) nie jest celem usuniecia.
+        else if (/^(@instance\/?|@tools\/?|\.?\/?)$/.test(c.target)) err(cw, `"target" wskazuje katalog glowny: "${c.target}"`);
+      }
+    }
+    if (c.op === 'disableMods' || c.op === 'enableMods') {
+      if (!Array.isArray(c.prefixes) || !c.prefixes.length) err(cw, 'brak "prefixes"');
+    }
+    if (c.op === 'disableMods') {
+      if (!c.scan || !Array.isArray(c.scan.tokens) || !c.scan.tokens.length) {
+        err(cw, '"scan.tokens" jest OBOWIAZKOWY - mods.toml nie wystarcza');
+      }
+    }
+  }
 }
 
 function validate(m) {
@@ -128,34 +172,11 @@ function validate(m) {
     }
 
     if (!Array.isArray(item.changes) || !item.changes.length) { err(w, 'brak "changes"'); continue; }
-    for (const [j, c] of item.changes.entries()) {
-      const cw = `${w}.changes[${j}]`;
-      if (!OPS.includes(c.op)) { err(cw, `nieznana operacja "${c.op}"`); continue; }
-
-      if (c.op === 'setKey' || c.op === 'setJson') {
-        if (!c.file) err(cw, 'brak "file"');
-        else { const bad = badPath(c.file); if (bad) err(cw, bad); }
-        if (!c.key) err(cw, 'brak "key"');
-        if (typeof c.value !== 'string') err(cw, '"value" musi byc napisem');
-        if (c.op === 'setKey' && !STYLES.includes(c.style)) err(cw, `zly "style" (${STYLES.join('/')})`);
-      }
-      if (c.op === 'installAsset' || c.op === 'installRelease') {
-        if (!c.asset) err(cw, 'brak "asset"');
-        if (!c.target) err(cw, 'brak "target"');
-        else { const bad = badPath(c.target); if (bad) err(cw, bad); }
-        if (c.op === 'installRelease' && !/^[\w.-]+\/[\w.-]+$/.test(c.repo || '')) {
-          err(cw, '"repo" ma miec postac wlasciciel/repozytorium');
-        }
-        if (c.unpack !== undefined && c.unpack !== null && c.unpack !== 'zip') {
-          err(cw, '"unpack" moze byc tylko "zip"');
-        }
-      }
-      if (c.op === 'disableMods') {
-        if (!Array.isArray(c.prefixes) || !c.prefixes.length) err(cw, 'brak "prefixes"');
-        if (!c.scan || !Array.isArray(c.scan.tokens) || !c.scan.tokens.length) {
-          err(cw, '"scan.tokens" jest OBOWIAZKOWY - mods.toml nie wystarcza');
-        }
-      }
+    validateOps(item.changes, `${w}.changes`, err);
+    // "undo" jest opcjonalne: opis stanu "wylaczony" pozycji (PRESET-FORMAT.md par. 6).
+    if (item.undo !== undefined) {
+      if (!Array.isArray(item.undo) || !item.undo.length) err(w, '"undo" ma byc niepusta lista operacji');
+      else validateOps(item.undo, `${w}.undo`, err);
     }
   }
   if (!itemIds.size) err('preset', 'brak "items"');

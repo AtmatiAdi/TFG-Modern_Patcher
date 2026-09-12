@@ -25,6 +25,10 @@ Pojedynczy przenośny `.exe` — nie wymaga Javy ani niczego doinstalowanego.
    klik w nagłówek rozwija pojedynczą, przycisk **Rozwiń wszystko** pokazuje całość.
    Licznik u góry mówi, **ile zostanie zmienione po kliknięciu**, więc idzie za polami
    wyboru: odznaczenie czegoś zmienia go od razu (*„3 z 11 do zmiany"*).
+   Pole wyboru ma **trzy położenia**: ✓ zastosuj, ✕ wycofaj, puste = nie ruszaj.
+   „Wycofaj" pojawia się tam, gdzie preset opisał stan wyłączony pozycji — i profile
+   korzystają z tego same: High **zdejmuje** RAM Keepera założonego przez Standard, a nie
+   tylko go nie zaznacza. Plan nie jest przyrostowy.
 5. **Zastosuj zaznaczone.**
 
 | Profil | Dla kogo |
@@ -49,6 +53,8 @@ aplikacja działa na tym, co już ściągnęła.
 node src/cli.js -i /sciezka/do/serwera            # sam plan
 node src/cli.js -i /sciezka/do/serwera --apply
 node src/cli.js -i /sciezka/do/serwera --revert
+node src/cli.js -i <sciezka> -p high --apply       # pozycje odznaczone w High z "undo" sa wycofywane
+node src/cli.js -i <sciezka> --apply --off ram-keeper   # wycofanie konkretnej pozycji
 ```
 
 > Jeśli wyłączasz Xaero na kliencie, **wyłącz je też na serwerze**. Xaero nie ustawia

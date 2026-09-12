@@ -59,6 +59,19 @@ function createWindow() {
  */
 function dumpLayout(w, file) {
   w.webContents.once('did-finish-load', () => {
+    // TFG_UI_PROFILE=<id>: przelacza profil przed zrzutem (widok "wycofaj" w High).
+    // TFG_UI_SCROLL=<id pozycji>: rozwija wszystko i przewija plan do tej pozycji.
+    const profile = process.env.TFG_UI_PROFILE;
+    if (profile) {
+      setTimeout(() => w.webContents.executeJavaScript(
+        `document.querySelector('.seg[data-profile=${JSON.stringify(profile)}]')?.click()`), 1200);
+    }
+    if (process.env.TFG_UI_SCROLL) {
+      setTimeout(() => w.webContents.executeJavaScript(`(() => {
+        document.querySelector('#expandBtn')?.click();
+        document.querySelector('.item[data-id=${JSON.stringify(process.env.TFG_UI_SCROLL)}]')?.scrollIntoView();
+      })()`), 2000);
+    }
     setTimeout(() => {
       w.webContents.executeJavaScript(`(() => {
         const vw = document.documentElement.clientWidth;
@@ -128,6 +141,14 @@ ipcMain.handle('app:info', () => ({
  */
 ipcMain.handle('catalog:refresh', async () => {
   try {
+    // TFG_OFFLINE=1: bez sieci - okno pracuje na tym, co lezy w cache (testy presetu
+    // przed wydaniem, praca bez internetu).
+    if (process.env.TFG_OFFLINE) {
+      send('log', 'TFG_OFFLINE: bez sprawdzania zrodel, plan z cache.');
+      return { ok: true, mods: catalog.resolved(), presets: catalog.presets().length,
+               groups: patches.groups(), profiles: runner.profiles(),
+               usingPreset: patches.usingPreset() };
+    }
     const res = await catalog.refresh(msg => send('log', msg));
     return { ok: true, mods: res.mods, presets: res.presets.length,
              groups: patches.groups(), profiles: runner.profiles(),

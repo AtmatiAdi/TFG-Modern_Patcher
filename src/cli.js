@@ -10,7 +10,7 @@ const patches = require('./engine/patches');
 
 function parse(argv) {
   const o = { dir: null, profile: 'standard', apply: false, revert: false, list: false,
-              only: null, skip: [], force: false, scan: true, renderDistance: null, xmx: null,
+              only: null, skip: [], off: [], force: false, scan: true, renderDistance: null, xmx: null,
               offline: false, refreshOnly: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -22,6 +22,7 @@ function parse(argv) {
     else if (a === '--list') o.list = true;
     else if (a === '--only') o.only = next().split(/[,\s]+/).filter(Boolean);
     else if (a === '--skip') o.skip = next().split(/[,\s]+/).filter(Boolean);
+    else if (a === '--off') o.off = next().split(/[,\s]+/).filter(Boolean);
     else if (a === '--force') o.force = true;
     else if (a === '--no-scan') o.scan = false;
     else if (a === '--offline') o.offline = true;
@@ -44,9 +45,11 @@ function usage() {
 
   node src/cli.js --refresh          (samo pobranie wydan do cache)
 
-  --only id1,id2   --skip id1,id2   --force   --no-scan   --offline
+  --only id1,id2   --skip id1,id2   --off id1,id2   --force   --no-scan   --offline
   --render-distance <n>   --xmx <MB>
 
+--off wycofuje pozycje (wykonuje jej "undo" z presetu) zamiast ja zastosowac.
+Pozycje odznaczone w profilu, ktore maja "undo", sa wycofywane domyslnie.
 Bez --apply pokazuje tylko plan. Opis: docs/PATCHER.md`);
 }
 
@@ -77,6 +80,10 @@ async function main() {
         console.log(`${p.id.padEnd(20)} [${p.side}]  ${p.title}`);
         console.log(`  dok: ${p.doc}`);
         for (const c of p.changes) console.log('  - ' + c.describe(opts));
+        if (p.undo) {
+          console.log('  wycofanie:');
+          for (const c of p.undo) console.log('  ~ ' + c.describe(opts));
+        }
       }
       console.log('');
     }
@@ -105,7 +112,10 @@ async function main() {
   console.log(`Profil: ${opts.profile} (renderDistance=${opts.renderDistance}, MaxMemAlloc=${opts.xmx})\n`);
 
   const items = runner.plan(inst, opts);
+  // Tryb pozycji: z presetu (profil), a --off wymusza wycofanie tam, gdzie preset je opisal.
+  const modeOf = it => (args.off.includes(it.id) && it.canUndo ? 'off' : it.mode);
   const tag = { ok: '[ ZROBIONE]', todo: '[DO ZMIANY]', missing: '[BRAK CELU]', error: '[    BLAD ]', skipped: '[POMINIETE]' };
+  const offTag = { ...tag, ok: '[ WYCOFANE]', todo: '[ WYCOFAC ]' };
   const mark = { ok: 'ok  ', todo: '->  ', missing: '--  ', error: '!!  ' };
   let n = 0;
   for (const g of patches.groups()) {
@@ -114,20 +124,26 @@ async function main() {
     console.log(`\n== ${g.label.toUpperCase()}`);
     for (const it of inGroup) {
       n++;
-      console.log(`${tag[it.state]} ${String(n).padStart(2)}. ${it.id.padEnd(20)} ${it.title}`);
+      const off = modeOf(it) === 'off';
+      const state = off ? it.undoState : it.state;
+      const statuses = off ? it.undoStatuses : it.statuses;
+      console.log(`${(off ? offTag : tag)[state]} ${String(n).padStart(2)}. ${it.id.padEnd(20)} ${it.title}`
+        + (modeOf(it) === 'skip' && state === 'todo' ? '   (odznaczone w profilu - nie ruszam)' : ''));
       if (it.skipReason) console.log(`               (${it.skipReason})`);
-      else it.statuses.forEach(s => console.log(`               ${mark[s.state]}${s.text}`));
+      else statuses.forEach(s => console.log(`               ${mark[s.state]}${s.text}`));
     }
   }
 
-  // Domyslnie bierzemy to, co jest do zrobienia I co preset uznaje za zaznaczone
-  // w tym profilu (np. narzedzie RAM jest odznaczone w profilu "high").
-  let ids = items.filter(i => i.state === 'todo' && i.selected !== false).map(i => i.id);
-  if (args.only) ids = ids.filter(id => args.only.includes(id));
-  if (args.skip.length) ids = ids.filter(id => !args.skip.includes(id));
+  // Domyslnie: pozycje "on" do zrobienia i pozycje "off" do wycofania. --only/--skip
+  // zawezaja jedno i drugie po id.
+  const wanted = id => (!args.only || args.only.includes(id)) && !args.skip.includes(id);
+  const ids = {
+    on: items.filter(i => modeOf(i) === 'on' && i.state === 'todo' && wanted(i.id)).map(i => i.id),
+    off: items.filter(i => modeOf(i) === 'off' && i.undoState === 'todo' && wanted(i.id)).map(i => i.id),
+  };
 
   if (!args.apply) { console.log('\n(plan - dodaj --apply, zeby zastosowac)'); return 0; }
-  if (!ids.length) { console.log('\nNic do zrobienia.'); return 0; }
+  if (!ids.on.length && !ids.off.length) { console.log('\nNic do zrobienia.'); return 0; }
 
   console.log('\nStosuje zmiany:');
   const res = runner.apply(inst, opts, ids, console.log);

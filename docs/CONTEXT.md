@@ -74,6 +74,16 @@ jarów, a operacja `disableMods` ma w formacie presetu **obowiązkowe** `scan.to
   `invoke`, przy zachowanej kolejności FIFO między samymi `send`. Dlatego podsumowanie
   („Gotowe: …”) wypisuje proces główny kanałem logu, a nie okno z wyniku `invoke` —
   inaczej ląduje przed ostatnimi liniami operacji.
+- **`instance.cfg` to QSettings — backslash jest znakiem ucieczki.** Prism (od 8.0,
+  `ConfigVersion=1.3`) czyta plik przez `QSettings::IniFormat`: `\\` to backslash, `\t` to
+  tabulator, a nieznaną sekwencję (`\U`, `\.`) wyrzuca razem z backslashem. Ścieżka
+  Windows wpisana dosłownie działała do pierwszego zapisu pliku przez Prisma (start gry),
+  po którym `PreLaunchCommand` stawał się `C:sers…<TAB>ools…`. Styl `ini` w `textconfig.js`
+  koduje i dekoduje wartości po QSettingsowemu; preset podaje wartość logiczną.
+- **Profile muszą się wzajemnie wycofywać, nie tylko dokładać.** `selected: false`
+  znaczyło „nie zakładaj" — więc po przypadkowym Standardzie przełączenie na High
+  zostawiało RAM Keepera na miejscu i nie było jak go zdjąć. Stąd `undo` w presecie,
+  trójstan w oknie (✓ / ✕ / puste) i `--off` w CLI; preset bez `undo` działa jak dawniej.
 - **Etykieta operacji musi przejść przez podstawienie zmiennych.** Bez tego log i plan
   pokazywały `shaderpacks/{shaderpack}.txt` zamiast pliku, który naprawdę jest ruszany.
 - **Xaero trzeba wyłączyć TAKŻE na serwerze.** Nie ustawia `displayTest` w `mods.toml`,
@@ -135,6 +145,8 @@ Zmienne środowiskowe przydatne przy pracy:
 | `TFG_GITHUB_TOKEN` | token do repo prywatnych i wyższych limitów |
 | `TFG_UI_DUMP=<plik>` | zrzut układu interfejsu i elementów wychodzących poza okno |
 | `TFG_UI_SHOT=<plik>` | zrzut ekranu okna (razem z `TFG_UI_DUMP`) |
+| `TFG_UI_PROFILE=<id>`, `TFG_UI_SCROLL=<id pozycji>` | profil i pozycja widoczne na zrzucie |
+| `TFG_OFFLINE=1` | okno nie sprawdza źródeł — plan z cache (test presetu przed wydaniem) |
 
 ---
 

@@ -265,6 +265,7 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: not-allowed; }
 }
 .item:hover { border-color: var(--edge); background: var(--glass-strong); }
 .item.todo { border-left: 2px solid var(--todo); }
+.item.todo.off { border-left-color: var(--warn); }
 .item.ok { opacity: .62; }
 .item.skipped, .item.missing { opacity: .45; }
 .item.error { border-left: 2px solid var(--err); }
@@ -317,6 +318,29 @@ input[type="checkbox"]:disabled { opacity: .35; cursor: not-allowed; }
 .pill.skipped { color: var(--txt-faint); background: rgba(255,255,255,.05); border-color: var(--edge-soft); }
 .pill.error   { color: var(--err);  background: rgba(255,122,138,.12); border-color: rgba(255,122,138,.34); }
 .pill.side    { color: var(--txt-faint); background: rgba(255,255,255,.04); border-color: var(--edge-soft); letter-spacing: .3px; text-transform: none; }
+/* pozycja ogladana od strony "wycofaj": bursztyn zamiast niebieskiego, zeby cofanie
+   nie wygladalo jak kolejne "do zmiany" */
+.pill.todo.off { color: var(--warn); background: rgba(255,204,102,.13); border-color: rgba(255,204,102,.36); }
+
+/* ---- trojstan pozycji: zastosuj (✓) / wycofaj (✕) / nie ruszaj (puste) -------- */
+.tri {
+  appearance: none; width: 17px; height: 17px; flex: none; border-radius: 6px; padding: 0;
+  border: 1px solid var(--edge); background: rgba(255,255,255,.06); cursor: pointer;
+  position: relative; transition: .15s; align-self: start;
+}
+.tri.on { background: linear-gradient(135deg, #9dbcff, #cf9dff); border-color: transparent; }
+.tri.on::after {
+  content: ""; position: absolute; left: 5px; top: 1.5px; width: 5px; height: 9px;
+  border: solid #08102a; border-width: 0 2px 2px 0; transform: rotate(42deg);
+}
+.tri.off { background: linear-gradient(135deg, #ffcc66, #ff9a7a); border-color: transparent; }
+.tri.off::before, .tri.off::after {
+  content: ""; position: absolute; left: 3px; top: 7px; width: 9px; height: 2px;
+  background: #2a1608; border-radius: 1px;
+}
+.tri.off::before { transform: rotate(45deg); }
+.tri.off::after { transform: rotate(-45deg); }
+.tri:disabled { opacity: .35; cursor: not-allowed; }
 
 .empty { padding: 34px; text-align: center; color: var(--txt-faint); font-size: 12.5px; }
 .busy { pointer-events: none; opacity: .55; }
