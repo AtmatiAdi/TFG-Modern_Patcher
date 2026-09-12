@@ -96,12 +96,21 @@ Pyta dopóki numer nie przejdzie kontroli: musi mieć postać `x.y.z`, nie być 
 commituje, wypycha i publikuje wydanie z tym plikiem (`gh release create`, opis
 generowany z commitów).
 
+Po udanej publikacji **kasuje starsze wydania Patchera** — domyślnie zostaje tylko nowe,
+żeby na stronie wydań był jeden plik do pobrania, a nie lista, z której ktoś weźmie
+nie ten. Sprzątanie idzie dopiero po `gh release create`: gdyby cokolwiek wcześniej
+padło, stare wydanie zostaje jedynym do pobrania. Znika **wydanie z załącznikami, nie
+tag** — tag za darmo pokazuje, który commit był którą wersją. Kasowane są wyłącznie
+tagi `v<x.y.z>`; wydanie moda albo presetu, gdyby kiedyś stanęło w tym repozytorium,
+skrypt zostawi w spokoju.
+
 | Przełącznik | Do czego |
 |---|---|
 | `-Version 3.1.1` | bez pytania — do skryptów |
 | `-DryRun` | tylko sprawdzenie i wypisanie, co by się stało; nie rusza `package.json` |
 | `-SkipBuild` | gdy `.exe` o tej wersji już leży w `dist/` |
 | `-Yes` | bez pytania „Wydać?" |
+| `-Keep 3` | ile wydań ma zostać po publikacji (domyślnie 1); `-Keep 0` wyłącza sprzątanie |
 
 Wymaga `gh` zalogowanego przez `gh auth login`.
 

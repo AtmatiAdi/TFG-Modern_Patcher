@@ -8,11 +8,14 @@
 #   pwsh -File release.ps1 -Version 3.1.1   # bez pytania (np. z innego skryptu)
 #   pwsh -File release.ps1 -DryRun          # wszystko oprocz commita i publikacji
 #   pwsh -File release.ps1 -SkipBuild       # gdy .exe o tej wersji juz lezy w dist/
+#   pwsh -File release.ps1 -Keep 3          # zostaw trzy najnowsze wydania, reszte skasuj
+#   pwsh -File release.ps1 -Keep 0          # nie kasuj niczego
 param(
   [string]$Version,
   [switch]$DryRun,
   [switch]$SkipBuild,
-  [switch]$Yes          # nie pytaj o potwierdzenie przed publikacja
+  [switch]$Yes,         # nie pytaj o potwierdzenie przed publikacja
+  [int]$Keep = 1        # ile wydan Patchera ma zostac PO publikacji (0 = nie sprzataj)
 )
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -35,6 +38,20 @@ function VerGt([string]$a, [string]$b) {
     if ($x -ne $y) { return $x -gt $y }
   }
   return $false
+}
+
+# Wydania PATCHERA, od najnowszego. Filtr `v<x.y.z>` jest istotny, a nie kosmetyczny:
+# to jedyne, co odroznia wydanie aplikacji od wydania MODA albo PRESETU (tagi
+# `<mod>-<x.y.z>`, `preset-<x.y.z>`). Gdyby kiedys w tym repozytorium stanelo jedno
+# obok drugiego, sprzatanie po wydaniu aplikacji NIE MOZE ruszyc katalogu, z ktorego
+# Patcher czyta mody - skasowanie takiego wydania zabiera odbiorcom plik do pobrania.
+function PatcherReleases() {
+  $json = & gh release list --limit 100 --json tagName 2>$null
+  if ($LASTEXITCODE -ne 0 -or -not $json) { return @() }
+  return @($json | ConvertFrom-Json |
+    Where-Object { $_.tagName -match '^v\d+\.\d+\.\d+$' } |
+    Sort-Object { [version]$_.tagName.TrimStart('v') } -Descending |
+    ForEach-Object { $_.tagName })
 }
 
 # --- 1. narzedzia --------------------------------------------------------------
@@ -119,11 +136,29 @@ $exePath = Join-Path $root ("dist\TFG-Patcher-{0}.exe" -f $Version)
 # przepuszcza. Szczegoly i pomiary: docs/PATCHER.md.
 $zipPath = Join-Path $root ("dist\TFG-Patcher-{0}.zip" -f $Version)
 
+# Co zniknie po publikacji. Liczymy PO doliczeniu nowego wydania, wiec -Keep 1 znaczy
+# "ma zostac samo nowe". Lista powstaje TERAZ, zeby bylo ja widac przed pytaniem
+# "Wydac?" - kasowanie wydania na GitHubie jest nieodwracalne.
+$toDelete = @()
+if ($Keep -gt 0) {
+  $existing = PatcherReleases
+  if ($existing.Count -ge $Keep) { $toDelete = @($existing | Select-Object -Skip ($Keep - 1)) }
+}
+
 Head 'Plan wydania'
 Write-Host ("  wersja:  {0} -> {1}" -f $current, $Version)
 Write-Host ("  tag:     {0}" -f $tag)
 Write-Host ("  pliki:   {0}" -f $exePath)
 Write-Host ("           {0}" -f $zipPath)
+if ($Keep -le 0) {
+  Write-Host "  sprzatanie: wylaczone (-Keep 0)" -ForegroundColor DarkGray
+} elseif ($toDelete) {
+  Write-Host ("  skasuje starsze wydania ({0}), zostanie {1}:" -f $toDelete.Count, $Keep) -ForegroundColor Yellow
+  $toDelete | ForEach-Object { Write-Host ("    $_") -ForegroundColor Yellow }
+  Write-Host "    (tagi i commity zostaja - znika wydanie razem z plikami do pobrania)" -ForegroundColor DarkGray
+} else {
+  Write-Host ("  sprzatanie: nie ma czego kasowac (zostawiamy {0} najnowszych)" -f $Keep) -ForegroundColor DarkGray
+}
 
 # Proba konczy sie tutaj: nie ruszamy package.json, zeby nie zostawic repo w polowie
 # wydania. Sam build sprawdza sie osobno przez build.ps1.
@@ -133,6 +168,7 @@ if ($DryRun) {
   Write-Host "  pwsh -File build.ps1"
   Write-Host "  git commit -am `"TFG Patcher $Version`" ; git push"
   Write-Host "  gh release create $tag `"$exePath`" `"$zipPath`" --title `"TFG Patcher $Version`" --generate-notes"
+  $toDelete | ForEach-Object { Write-Host "  gh release delete $_ --yes" }
   exit 0
 }
 
@@ -182,6 +218,24 @@ if ($LASTEXITCODE -ne 0) { Fail "git push zwrocil $LASTEXITCODE" }
 
 & gh release create $tag $exePath $zipPath --title "TFG Patcher $Version" --generate-notes
 if ($LASTEXITCODE -ne 0) { Fail "gh release create zwrocil $LASTEXITCODE" }
+
+# --- 7. sprzatanie -------------------------------------------------------------
+# Dopiero PO udanej publikacji: gdyby cokolwiek wyzej padlo, stare wydanie zostaje
+# jedynym, ktore odbiorcy moga pobrac. Kasujemy wydanie, NIE tag: tag za darmo
+# pokazuje, ktory commit byl ktora wersja, a samo wydanie i tak da sie odtworzyc
+# z niego buildem.
+if ($toDelete) {
+  Head 'Sprzatanie starszych wydan'
+  foreach ($old in $toDelete) {
+    & gh release delete $old --yes
+    if ($LASTEXITCODE -ne 0) {
+      # Nie przerywamy: nowe wydanie juz jest, a stare mozna skasowac recznie.
+      Write-Host ("  UWAGA: nie udalo sie skasowac {0}" -f $old) -ForegroundColor Yellow
+    } else {
+      Write-Host ("  skasowane: {0}" -f $old)
+    }
+  }
+}
 
 Write-Host ""
 Write-Host ("Wydane: {0} ({1} MB)" -f $tag, $mb) -ForegroundColor Green
