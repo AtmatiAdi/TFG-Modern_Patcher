@@ -338,13 +338,9 @@ async function doApply() {
   setBusy(true);
   log('');
   log('Stosuje zmiany...');
-  const res = await window.patcher.apply(dir, options(), ids);
-  if (!res.ok) log('BLAD: ' + res.error);
-  else {
-    log('');
-    log(`Gotowe: zalatanych ${res.applied}, bledow ${res.failed}, pominietych ${res.skipped}.`);
-    if (res.journal) log('Kopie zapasowe: ' + res.journal);
-  }
+  // Podsumowanie i ewentualny blad wypisuje proces glowny przez kanal logu - inaczej
+  // wyladowalyby przed ostatnimi liniami operacji (patrz main.js, plan:apply).
+  await window.patcher.apply(dir, options(), ids);
   setBusy(false);
   refreshPlan();
 }
@@ -378,9 +374,7 @@ async function doRevert() {
   const dir = els.path.value.trim();
   setBusy(true);
   log('');
-  const res = await window.patcher.revert(dir);
-  if (!res.ok) log('BLAD: ' + res.error);
-  else log(res.count < 0 ? 'Nic nie cofnieto.' : 'Cofnieto operacji: ' + res.count);
+  await window.patcher.revert(dir);
   setBusy(false);
   refreshPlan();
 }

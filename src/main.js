@@ -178,23 +178,37 @@ ipcMain.handle('plan:build', (e, { dir, options }) => {
   }
 });
 
+/**
+ * Podsumowanie idzie TYM SAMYM kanalem, co reszta logu, a nie odpowiedzia na invoke.
+ * Zmierzone: odpowiedz na `invoke` wyprzedza w oknie wszystkie `webContents.send`
+ * wyslane z wnetrza tej samej obslugi, wiec okno pisalo "Gotowe: ..." przed ostatnimi
+ * liniami operacji (np. przed komunikatem o przerwanym wylaczaniu modow).
+ */
 ipcMain.handle('plan:apply', (e, { dir, options, ids }) => {
+  const log = msg => send('log', msg);
   try {
     const inst = instanceLib.detect(dir);
     const opts = { ...runner.defaults(options.profile), ...options };
-    const result = runner.apply(inst, opts, ids, msg => send('log', msg));
+    const result = runner.apply(inst, opts, ids, log);
+    log('');
+    log(`Gotowe: zalatanych ${result.applied}, bledow ${result.failed}, pominietych ${result.skipped}.`);
+    if (result.journal) log('Kopie zapasowe: ' + result.journal);
     return { ok: true, ...result };
   } catch (e2) {
+    log('BLAD: ' + e2.message);
     return { ok: false, error: e2.message };
   }
 });
 
 ipcMain.handle('plan:revert', (e, { dir }) => {
+  const log = msg => send('log', msg);
   try {
     const inst = instanceLib.detect(dir);
-    const res = journal.revert(inst.root, msg => send('log', msg));
+    const res = journal.revert(inst.root, log);
+    log(res.count < 0 ? 'Nic nie cofnieto.' : 'Cofnieto operacji: ' + res.count);
     return { ok: true, ...res };
   } catch (e2) {
+    log('BLAD: ' + e2.message);
     return { ok: false, error: e2.message };
   }
 });
