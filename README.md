@@ -102,7 +102,9 @@ nie ten. Sprzątanie idzie dopiero po `gh release create`: gdyby cokolwiek wcze�
 padło, stare wydanie zostaje jedynym do pobrania. Znika **wydanie z załącznikami, nie
 tag** — tag za darmo pokazuje, który commit był którą wersją. Kasowane są wyłącznie
 tagi `v<x.y.z>`; wydanie moda albo presetu, gdyby kiedyś stanęło w tym repozytorium,
-skrypt zostawi w spokoju.
+skrypt zostawi w spokoju. Tą samą miarą sprząta **`dist/`**: każda budowa zostawia tam
+~200 MB (`.exe` + `.zip`), a starsze buildy nie są do niczego — wydane leżą na GitHubie,
+każdy da się odtworzyć z tagu.
 
 | Przełącznik | Do czego |
 |---|---|
@@ -110,7 +112,7 @@ skrypt zostawi w spokoju.
 | `-DryRun` | tylko sprawdzenie i wypisanie, co by się stało; nie rusza `package.json` |
 | `-SkipBuild` | gdy `.exe` o tej wersji już leży w `dist/` |
 | `-Yes` | bez pytania „Wydać?" |
-| `-Keep 3` | ile wydań ma zostać po publikacji (domyślnie 1); `-Keep 0` wyłącza sprzątanie |
+| `-Keep 3` | ile wersji ma zostać po publikacji — na GitHubie i w `dist/` (domyślnie 1); `-Keep 0` wyłącza sprzątanie |
 
 Wymaga `gh` zalogowanego przez `gh auth login`.
 

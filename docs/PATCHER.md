@@ -205,7 +205,7 @@ build/
   make-icon.js       generator ikony: siatka 16x16 -> icon.ico (+ icon.png do podgladu)
   icon.ico           wynik generatora, w repo dla `npm run dist` i `npm start`
 build.ps1            budowa -> dist/TFG-Patcher-<wersja>.exe
-release.ps1          wydanie: pyta o numer, buduje, publikuje przez gh, kasuje starsze wydania (-Keep)
+release.ps1          wydanie: pyta o numer, buduje, publikuje przez gh, kasuje starsze wersje na GitHubie i w dist/ (-Keep)
 ```
 
 Do `.exe` wchodzi `src/`, `sources.json` i `icon.ico`. **Ani jednego zasobu gry** —

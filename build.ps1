@@ -54,7 +54,11 @@ try {
   Pop-Location
 }
 
+# Tylko pliki TEJ wersji: dist/ moze trzymac starsze buildy, a "Zbudowano" o pliku
+# sprzed miesiaca wprowadzalo w blad.
+$ver = (Get-Content (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
 Write-Host ""
-Get-ChildItem (Join-Path $root 'dist') -Include '*.exe', '*.zip' -Recurse -Depth 0 -ErrorAction SilentlyContinue |
+Get-ChildItem (Join-Path $root 'dist') -File -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -match ('^TFG-Patcher-' + [regex]::Escape($ver) + '\.(exe|zip)$') } |
   Sort-Object Name |
   ForEach-Object { Write-Host ("Zbudowano: {0} ({1} MB)" -f $_.FullName, [math]::Round($_.Length/1MB,1)) }

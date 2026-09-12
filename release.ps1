@@ -8,14 +8,14 @@
 #   pwsh -File release.ps1 -Version 3.1.1   # bez pytania (np. z innego skryptu)
 #   pwsh -File release.ps1 -DryRun          # wszystko oprocz commita i publikacji
 #   pwsh -File release.ps1 -SkipBuild       # gdy .exe o tej wersji juz lezy w dist/
-#   pwsh -File release.ps1 -Keep 3          # zostaw trzy najnowsze wydania, reszte skasuj
+#   pwsh -File release.ps1 -Keep 3          # zostaw trzy najnowsze wersje, reszte skasuj
 #   pwsh -File release.ps1 -Keep 0          # nie kasuj niczego
 param(
   [string]$Version,
   [switch]$DryRun,
   [switch]$SkipBuild,
   [switch]$Yes,         # nie pytaj o potwierdzenie przed publikacja
-  [int]$Keep = 1        # ile wydan Patchera ma zostac PO publikacji (0 = nie sprzataj)
+  [int]$Keep = 1        # ile wersji ma zostac PO publikacji - na GitHubie i w dist/ (0 = nie sprzataj)
 )
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -52,6 +52,24 @@ function PatcherReleases() {
     Where-Object { $_.tagName -match '^v\d+\.\d+\.\d+$' } |
     Sort-Object { [version]$_.tagName.TrimStart('v') } -Descending |
     ForEach-Object { $_.tagName })
+}
+
+# Zbudowane wersje w dist/, od najnowszej - po numerze z nazwy pliku, nie po dacie.
+# Kazda budowa zostawia tu ~200 MB (.exe + .zip), a stare wersje nie sa do niczego:
+# wydane leza na GitHubie, a kazda da sie odtworzyc z tagu buildem.
+function DistVersions() {
+  $dist = Join-Path $root 'dist'
+  if (-not (Test-Path $dist)) { return @() }
+  $vers = @{}
+  foreach ($f in Get-ChildItem $dist -File) {
+    if ($f.Name -match '^TFG-Patcher-(\d+\.\d+\.\d+)\.(exe|zip)$') { $vers[$Matches[1]] = $true }
+  }
+  return @($vers.Keys | Sort-Object { [version]$_ } -Descending)
+}
+
+function DistFiles([string]$ver) {
+  return @(Get-ChildItem (Join-Path $root 'dist') -File |
+    Where-Object { $_.Name -match ('^TFG-Patcher-' + [regex]::Escape($ver) + '\.(exe|zip)$') })
 }
 
 # --- 1. narzedzia --------------------------------------------------------------
@@ -140,9 +158,14 @@ $zipPath = Join-Path $root ("dist\TFG-Patcher-{0}.zip" -f $Version)
 # "ma zostac samo nowe". Lista powstaje TERAZ, zeby bylo ja widac przed pytaniem
 # "Wydac?" - kasowanie wydania na GitHubie jest nieodwracalne.
 $toDelete = @()
+$distToDelete = @()
 if ($Keep -gt 0) {
   $existing = PatcherReleases
   if ($existing.Count -ge $Keep) { $toDelete = @($existing | Select-Object -Skip ($Keep - 1)) }
+  # dist/ liczymy tak samo: nowa wersja doliczona, wiec z zastanych zostaje Keep-1.
+  # Nowa wersja moze juz lezec w dist/ (-SkipBuild) - jej nie ruszamy nigdy.
+  $built = @(DistVersions | Where-Object { $_ -ne $Version })
+  if ($built.Count -ge $Keep) { $distToDelete = @($built | Select-Object -Skip ($Keep - 1)) }
 }
 
 Head 'Plan wydania'
@@ -152,12 +175,21 @@ Write-Host ("  pliki:   {0}" -f $exePath)
 Write-Host ("           {0}" -f $zipPath)
 if ($Keep -le 0) {
   Write-Host "  sprzatanie: wylaczone (-Keep 0)" -ForegroundColor DarkGray
-} elseif ($toDelete) {
-  Write-Host ("  skasuje starsze wydania ({0}), zostanie {1}:" -f $toDelete.Count, $Keep) -ForegroundColor Yellow
-  $toDelete | ForEach-Object { Write-Host ("    $_") -ForegroundColor Yellow }
-  Write-Host "    (tagi i commity zostaja - znika wydanie razem z plikami do pobrania)" -ForegroundColor DarkGray
 } else {
-  Write-Host ("  sprzatanie: nie ma czego kasowac (zostawiamy {0} najnowszych)" -f $Keep) -ForegroundColor DarkGray
+  if ($toDelete) {
+    Write-Host ("  skasuje starsze wydania na GitHubie ({0}), zostanie {1}:" -f $toDelete.Count, $Keep) -ForegroundColor Yellow
+    $toDelete | ForEach-Object { Write-Host ("    $_") -ForegroundColor Yellow }
+    Write-Host "    (tagi i commity zostaja - znika wydanie razem z plikami do pobrania)" -ForegroundColor DarkGray
+  }
+  if ($distToDelete) {
+    $files = @($distToDelete | ForEach-Object { DistFiles $_ })
+    $mbOld = [math]::Round(($files | Measure-Object Length -Sum).Sum / 1MB)
+    Write-Host ("  skasuje starsze buildy w dist/ ({0} plikow, {1} MB):" -f $files.Count, $mbOld) -ForegroundColor Yellow
+    $files | ForEach-Object { Write-Host ("    " + $_.Name) -ForegroundColor Yellow }
+  }
+  if (-not $toDelete -and -not $distToDelete) {
+    Write-Host ("  sprzatanie: nie ma czego kasowac (zostawiamy {0} najnowszych)" -f $Keep) -ForegroundColor DarkGray
+  }
 }
 
 # Proba konczy sie tutaj: nie ruszamy package.json, zeby nie zostawic repo w polowie
@@ -169,6 +201,7 @@ if ($DryRun) {
   Write-Host "  git commit -am `"TFG Patcher $Version`" ; git push"
   Write-Host "  gh release create $tag `"$exePath`" `"$zipPath`" --title `"TFG Patcher $Version`" --generate-notes"
   $toDelete | ForEach-Object { Write-Host "  gh release delete $_ --yes" }
+  $distToDelete | ForEach-Object { DistFiles $_ } | ForEach-Object { Write-Host "  Remove-Item dist\$($_.Name)" }
   exit 0
 }
 
@@ -224,15 +257,28 @@ if ($LASTEXITCODE -ne 0) { Fail "gh release create zwrocil $LASTEXITCODE" }
 # jedynym, ktore odbiorcy moga pobrac. Kasujemy wydanie, NIE tag: tag za darmo
 # pokazuje, ktory commit byl ktora wersja, a samo wydanie i tak da sie odtworzyc
 # z niego buildem.
-if ($toDelete) {
-  Head 'Sprzatanie starszych wydan'
+if ($toDelete -or $distToDelete) {
+  Head 'Sprzatanie starszych wersji'
   foreach ($old in $toDelete) {
     & gh release delete $old --yes
     if ($LASTEXITCODE -ne 0) {
       # Nie przerywamy: nowe wydanie juz jest, a stare mozna skasowac recznie.
-      Write-Host ("  UWAGA: nie udalo sie skasowac {0}" -f $old) -ForegroundColor Yellow
+      Write-Host ("  UWAGA: nie udalo sie skasowac wydania {0}" -f $old) -ForegroundColor Yellow
     } else {
-      Write-Host ("  skasowane: {0}" -f $old)
+      Write-Host ("  skasowane wydanie: {0}" -f $old)
+    }
+  }
+  # Stare buildy dopiero teraz, z tego samego powodu co wydania: gdyby publikacja padla,
+  # w dist/ zostaje to, co bylo. Lista plikow liczona PONOWNIE, nie z planu - build
+  # mogl zmienic zawartosc katalogu.
+  foreach ($old in $distToDelete) {
+    foreach ($f in DistFiles $old) {
+      try {
+        Remove-Item $f.FullName -Force -ErrorAction Stop
+        Write-Host ("  skasowany build: {0}" -f $f.Name)
+      } catch {
+        Write-Host ("  UWAGA: nie udalo sie skasowac {0}: {1}" -f $f.Name, $_.Exception.Message) -ForegroundColor Yellow
+      }
     }
   }
 }

@@ -112,7 +112,7 @@ pwsh -File build.ps1            # -> dist/TFG-Patcher-<wersja>.exe
 pwsh -File build.ps1 -SkipInstall
 pwsh -File release.ps1          # wydanie: pyta o numer, buduje, publikuje przez gh
 pwsh -File release.ps1 -DryRun  # samo sprawdzenie, bez ruszania package.json
-pwsh -File release.ps1 -Keep 0  # bez kasowania starszych wydan (domyslnie zostaje tylko nowe)
+pwsh -File release.ps1 -Keep 0  # bez kasowania starszych wersji na GitHubie i w dist/ (domyslnie zostaje tylko nowa)
 npm run icon                    # przerysowanie ikony (build.ps1 robi to sam)
 node src\cli.js --list          # co aplikacja wprowadza, grupami
 node src\cli.js --refresh       # samo pobranie wydan do cache
