@@ -92,6 +92,15 @@ function subst(text, vars) {
   });
 }
 
+/** Podstawienie do napisu, ktory sluzy tylko do pokazania - surowy zapis jest lepszy niz blad. */
+function safeSubst(text, vars) {
+  try {
+    return subst(text, vars);
+  } catch {
+    return text;
+  }
+}
+
 /** Domyslne zaznaczenie pozycji dla danego profilu (patrz PRESET-FORMAT.md par. 6). */
 function defaultSelected(item, profileId) {
   const s = item.selected;
@@ -104,7 +113,11 @@ function defaultSelected(item, profileId) {
 
 function change(op, vars, inst, source) {
   const file = () => i => resolveTarget(i, subst(op.file, vars));
-  const label = String(op.file || op.target || '').replace(/^@\w+\//, '');
+  // Etykieta MUSI przejsc przez podstawienie, inaczej plan i dziennik pokazuja surowy
+  // zapis z manifestu - "shaderpacks/{shaderpack}.txt" zamiast nazwy pliku, ktory
+  // faktycznie jest ruszany. Nieznana zmienna nie moze tu wywalic pozycji: sciezke
+  // podstawia sie osobno przy check/apply i to ona ma zglosic blad.
+  const label = safeSubst(String(op.file || op.target || ''), vars).replace(/^@\w+\//, '');
 
   if (op.op === 'setKey') {
     return setKey({
