@@ -220,7 +220,9 @@ function disableMods({ prefixes, scan }) {
       if (toDisable.length) return todo('wylaczy: ' + toDisable.map(p => path.basename(p)).join(', '));
       const off = fs.readdirSync(inst.mods).filter(n => n.endsWith('.jar.disabled')
         && prefixes.some(p => n.startsWith(p)));
-      if (off.length) return ok(`${off.length} z ${prefixes.length} modow jest juz wylaczonych`);
+      // Liczymy WYLACZONE PLIKI, nie prefiksy - jeden prefiks moze zlapac kilka jarow
+      // i "4 z 3 modow" wygladalo jak usterka.
+      if (off.length) return ok(`wylaczone (${off.length}): ` + off.map(n => n.replace(/\.jar\.disabled$/, '')).join(', '));
       return missing(`zadnego z modow (${prefixes.join(', ')}) nie ma w tej instancji`);
     },
     apply(inst, opts, journal, log) {
@@ -236,11 +238,12 @@ function disableMods({ prefixes, scan }) {
         const hard = hits.filter(h => !h.soft);
         const soft = hits.filter(h => h.soft);
         if (soft.length) {
-          log('    opcjonalne integracje (bezpieczne, ladują sie tylko gdy mod obecny):');
+          log('    opcjonalne integracje (bezpieczne - odwolania w cialach metod, mod'
+            + ' siega tam tylko gdy drugi mod jest obecny):');
           for (const h of soft) log(`      ${h.jar} - ${h.classes.length} klas, np. ${h.classes[0]}`);
         }
         if (hard.length) {
-          const list = hard.map(h => `${h.jar} (${h.classes[0]})`).join(', ');
+          const list = hard.map(h => `${h.jar} (${h.hard[0].name} ${h.hard[0].reason})`).join(', ');
           if (!opts.force) {
             throw new Error(`TWARDE zaleznosci od wylaczanych modow: ${list}. `
               + 'Wylaczenie moze wywalic gre - przerwane. Wymus tylko swiadomie.');

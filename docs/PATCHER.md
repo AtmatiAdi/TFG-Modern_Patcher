@@ -132,7 +132,30 @@ Sam fakt trafienia to jednak za mało. Pierwsza wersja blokowała `xaero-off`, b
 
 Stąd: wąskie tokeny (`xaero/common/`, `xaero/map/`, `xaero/hud/`, `xaero/minimap/`) plus
 klasyfikacja trafień na **miękkie** (tylko informacja w logu) i **twarde** (przerywają
-wykonanie, chyba że `--force`). Efekt na naszej paczce: 255 modów, 0 twardych, 1,7 s.
+wykonanie, chyba że `--force`).
+
+Sama **ścieżka** klasy też nie wystarcza (modpack 0.13.10, 2026-09-12). SeasonHUD trzyma
+obsługę każdej minimapy w `forge/platform/ForgeMinimapHelper` — nazwa pakietu nie mówi
+„compat”, więc reguła po ścieżce uznała to za twardą zależność i **zablokowała
+`xaero-off`**, chociaż ten mod działa bez Xaero bez zarzutu.
+
+Rozstrzyga to, czego JVM potrzebuje, żeby klasę **załadować**:
+
+| gdzie siedzi odwołanie | kiedy JVM je rozwiązuje | wniosek |
+|---|---|---|
+| nadklasa, interfejs | przy ładowaniu klasy | brak = `NoClassDefFoundError` → **twarde** |
+| ciało metody (`hideXaero`) | przy pierwszym wykonaniu instrukcji | mod pyta `ModList.isLoaded` i tam nie wchodzi → **miękkie** |
+
+Dlatego **twarde = klasa dziedziczy/implementuje typ wyłączanego moda ORAZ nie leży
+w pakiecie integracyjnym**. Sam warunek strukturalny nie wystarczy: GTCEU ma 14 klas
+dziedziczących po typach Xaero i mimo to chodzi z wyłączonym Xaero od 2026-07-24 — leżą
+w `integration/map/xaeros/` i `core/mixins/xaerominimap/`, które mod ładuje warunkowo.
+
+Efekt na paczce 0.13.10: 262 mody, 4 trafienia, **0 twardych**, 1,5 s. Kontrola negatywna
+(próbne wyłączenie `ftb-library`) nadal wykazuje 4 twarde zależności — ftb-chunks, quests,
+teams i xmod-compat dziedziczą po `dev/ftb/mods/ftblibrary/ui/BaseScreen` i pokrewnych.
+Parser nagłówka `.class` przeszedł 65 035 z 65 037 klas paczki; dwa pominięcia to
+`module-info.class`, które nadklasy nie ma z definicji.
 
 ---
 

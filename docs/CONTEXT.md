@@ -63,6 +63,19 @@ jarów, a operacja `disableMods` ma w formacie presetu **obowiązkowe** `scan.to
   blokowała `xaero-off`, bo token `xaero/` łapał `xaero/pac/` (Open Parties and Claims —
   inny mod tego samego autora) i opcjonalne integracje w pakietach `compat/`. Stąd wąskie
   tokeny i klasyfikacja w `modscan.js`.
+- **O twardości decyduje struktura klasy, nie nazwa pakietu.** Druga wersja znowu
+  zablokowała `xaero-off` — tym razem na SeasonHUD, którego `forge/platform/ForgeMinimapHelper`
+  nie wygląda na „compat”. Twarde jest tylko to, co JVM rozwiązuje **przy ładowaniu
+  klasy**: nadklasa i interfejsy. Odwołanie w ciele metody rozwiązuje się leniwie, więc
+  mod z `ModList.isLoaded` nigdy go nie dotknie. Szczegóły i kontrola negatywna:
+  `docs/PATCHER.md`.
+- **Odpowiedź na `ipcMain.handle` wyprzedza w oknie wszystkie `webContents.send`
+  z wnętrza tej samej obsługi.** Zmierzone: 300 linii logu dotarło **po** odpowiedzi na
+  `invoke`, przy zachowanej kolejności FIFO między samymi `send`. Dlatego podsumowanie
+  („Gotowe: …”) wypisuje proces główny kanałem logu, a nie okno z wyniku `invoke` —
+  inaczej ląduje przed ostatnimi liniami operacji.
+- **Etykieta operacji musi przejść przez podstawienie zmiennych.** Bez tego log i plan
+  pokazywały `shaderpacks/{shaderpack}.txt` zamiast pliku, który naprawdę jest ruszany.
 - **Xaero trzeba wyłączyć TAKŻE na serwerze.** Nie ustawia `displayTest` w `mods.toml`,
   więc Forge wymusza zgodność listy modów: serwer z Xaero **odrzuca** klienta bez Xaero.
 - **Stan pozycji trzeba sprawdzać ponownie tuż przed wykonaniem**, bo wcześniejsza
