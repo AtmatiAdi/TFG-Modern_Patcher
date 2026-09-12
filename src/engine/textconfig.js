@@ -9,8 +9,57 @@ const STYLES = {
   toml:       { sep: '=', sections: true,  indent: '\t', spaced: true },
   properties: { sep: '=', sections: false, indent: '',   spaced: false },
   options:    { sep: ':', sections: false, indent: '',   spaced: false },
-  ini:        { sep: '=', sections: true,  indent: '',   spaced: false },
+  // instance.cfg Prisma to QSettings IniFormat: backslash jest znakiem ucieczki,
+  // wiec sciezki Windows musza isc do pliku jako `\\` - patrz iniEncode/iniDecode.
+  ini:        { sep: '=', sections: true,  indent: '',   spaced: false, encode: iniEncode, decode: iniDecode },
 };
+
+// --- kodowanie wartosci QSettings (Prism, ConfigVersion 1.3) ---------------------
+// Prism czyta instance.cfg przez QSettings::IniFormat (launcher/settings/INIFile.cpp).
+// Tam `\` otwiera sekwencje ucieczki: `\\`, `\"`, `\n`, `\t`, `\r`, `\xHH;`, a NIEZNANA
+// sekwencja jest po cichu wyrzucana razem z backslashem. Gola sciezka Windows
+// `C:\Users\...\tools\ram-keeper.cmd` wraca z tego jako `C:sers...<TAB>ools...` i Prism
+// przy pierwszym zapisie pliku (start gry) utrwala te wersje. Dlatego preset podaje
+// wartosc LOGICZNA, a tu robimy z niej postac na dysk i z powrotem.
+
+const INI_ESCAPES = { '\\': '\\', '"': '"', n: '\n', t: '\t', r: '\r', a: '\x07', b: '\b', f: '\f', v: '\v', '?': '?', "'": "'" };
+
+/** Z linii pliku do wartosci logicznej: zdjete cudzyslowy, rozwiniete ucieczki. */
+function iniDecode(raw) {
+  let s = raw.trim();
+  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c !== '\\') { out += c; continue; }
+    const n = s[++i];
+    if (n === undefined) break;
+    if (n in INI_ESCAPES) { out += INI_ESCAPES[n]; continue; }
+    if (n === 'x') {                                   // \xHH; (srednik opcjonalny)
+      const m = /^[0-9a-fA-F]{1,4}/.exec(s.slice(i + 1));
+      if (m) { out += String.fromCharCode(parseInt(m[0], 16)); i += m[0].length; if (s[i + 1] === ';') i++; }
+      continue;
+    }
+    // nieznana sekwencja: QSettings wyrzuca ja razem z backslashem - robimy to samo,
+    // zeby porownanie widzialo to, co widzi Prism
+  }
+  return out;
+}
+
+/** Z wartosci logicznej (albo juz ujetej w cudzyslowy) do postaci QSettings. */
+function iniEncode(value) {
+  let s = String(value).trim();
+  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
+  const body = s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n').replace(/\t/g, '\\t').replace(/\r/g, '\\r');
+  // QSettings sam cytuje przy `;` `,` `=` i skrajnych spacjach; cytujemy tez sciezki
+  // i cokolwiek ze spacja, bo tak trzyma to Prism (JvmArgs) i tak pisza presety.
+  // Pusta wartosc zostaje pusta (`Klucz=`) - tak zapisuje ja sam Prism.
+  const quote = /[\s;,="\\#]/.test(body);
+  return quote ? '"' + body + '"' : body;
+}
 
 function esc(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -60,7 +109,8 @@ function get(file, section, key, style) {
   const i = indexOf(doc, section, key, style);
   if (i < 0) return null;
   const m = doc.lines[i].match(keyPattern(key, style));
-  return m ? m[2] : null;
+  if (!m) return null;
+  return style.decode ? style.decode(m[2]) : m[2];
 }
 
 /** Miejsce wstawienia brakujacego klucza: koniec wskazanej sekcji albo koniec pliku. */
@@ -81,14 +131,15 @@ function insertPoint(doc, section, style) {
 function set(file, section, key, style, value, addIfMissing = true) {
   const doc = load(file);
   const i = indexOf(doc, section, key, style);
+  const disk = style.encode ? style.encode(value) : value;
   if (i >= 0) {
     const m = doc.lines[i].match(keyPattern(key, style));
-    if (!m || m[2] === value) return false;
-    doc.lines[i] = m[1] + value + m[3];
+    if (!m || m[2] === disk) return false;
+    doc.lines[i] = m[1] + disk + m[3];
   } else {
     if (!addIfMissing) return false;
     const sep = style.spaced ? ` ${style.sep} ` : style.sep;
-    doc.lines.splice(insertPoint(doc, section, style), 0, style.indent + key + sep + value);
+    doc.lines.splice(insertPoint(doc, section, style), 0, style.indent + key + sep + disk);
   }
   save(doc);
   return true;
@@ -122,4 +173,4 @@ function norm(s) {
   return t;
 }
 
-module.exports = { STYLES, get, set, getJson, setJson, norm };
+module.exports = { STYLES, get, set, getJson, setJson, norm, iniEncode, iniDecode };
